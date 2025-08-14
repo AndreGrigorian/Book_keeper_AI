@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from transformers import pipeline
 from openpyxl import *
-
+import data_cleaner
 
 ## Facebook Bart Large MNLI -- Able to categorize based off given labels by user
 classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
@@ -56,7 +56,7 @@ def predict_COA(memo):
         "Business Loan Interest",
         "Amortization",
         ]
-        result = classifier(memo, labels)
+        result = classifier(memo, labels,  hypothesis_template="This transaction is related to {}.")
         # result['labels'][0] is the highest scored label
         return result['labels'][0]
 
@@ -119,7 +119,7 @@ def predict_COA(memo):
         "Charitable Contributions",
         "Organization Costs",
         ]
-        result = classifier(memo, labels)
+        result = classifier(memo, labels, hypothesis_template="This transaction is related to {}.")
         # result['labels'][0] is the highest scored label
         return result['labels'][0]
         
@@ -191,7 +191,7 @@ def predict_COA(memo):
         "Unrealized Gain/Loss",
         "Interest Expense - Non-deductible",
         ]
-        result = classifier(memo, labels)
+        result = classifier(memo, labels, hypothesis_template="This transaction is related to {}.")
         # result['labels'][0] is the highest scored label
         return result['labels'][0]
     elif entity_type == 'C-Corp':
@@ -261,7 +261,7 @@ def predict_COA(memo):
         "Unrealized Gain/Loss",
         "Interest Expense - Non-deductible",
         ]
-        result = classifier(memo, labels)
+        result = classifier(memo, labels, hypothesis_template="This transaction is related to {}.")
         # result['labels'][0] is the highest scored label
         return result['labels'][0]
 
@@ -346,19 +346,15 @@ def predict_COA(memo):
         "Property and Equipment",
         "Investments",
         ]
-        result = classifier(memo, labels)
+        result = classifier(memo, labels, hypothesis_template="This transaction is related to {}.")
         # result['labels'][0] is the highest scored label
         return result['labels'][0]
 
 # Load your Excel sheet into a DataFrame
-# df = pd.read_excel(dummy_data.xlsx")
+df = pd.read_excel("dummy_data.xlsx")
+df["Memo"] = df["Memo"].apply(janitor)
+df['Predicted Account'] = df['Memo'].apply(predict_COA)
 
 
-# df['Predicted Account'] = df['Memo'].apply(predict_COA)
+df.to_excel("updated_csv.xlsx", index=False)
 
-
-# df.to_excel("updated_csv.xlsx", index=False)
-
-memo = "Paid for Google Ads to promote our new product"
-category = predict_COA(memo)
-print("Predicted COA:", category)
