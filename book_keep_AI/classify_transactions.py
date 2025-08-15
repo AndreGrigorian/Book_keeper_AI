@@ -1,6 +1,7 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+import bookkeeper_brain
 
 load_dotenv()  # loads OPENAI_API_KEY from .env
 
@@ -18,9 +19,9 @@ CATEGORIES = [
     "Utilities", "Internet and Phone", "Education and Training",
     "Business Dues and Subscriptions", "Vehicle Expenses",
     "Home Office Expenses", "Postage and Shipping",
-    "Software and Online Services",
+    "Software Expense", "Miscelleanous City Taxes",
     "Owner's Draw", "Estimated Tax Payments", "Income Tax Expense",
-    "Payroll Taxes", "Business Loan Interest", "Amortization"
+    "Payroll Taxes", "Business Loan Interest", "Amortization", "Ask My Accountant"
 ]
 
 client = OpenAI()
@@ -30,6 +31,7 @@ def categorize_batch(memos):
     """
     Takes a list of memos and returns a list of predicted categories using one API call.
     """
+
     formatted_memos = "\n".join(
         [f"{i+1}. {memo}" for i, memo in enumerate(memos)])
 
@@ -37,6 +39,7 @@ def categorize_batch(memos):
 You are a professional bookkeeping AI. You will categorize memos into the best matching accounting category from the list below.
 
 If a memo clearly does not match any category, respond with "Ask my accountant".
+
 
 Categories:
 {", ".join(CATEGORIES)}
