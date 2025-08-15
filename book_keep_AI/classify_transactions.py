@@ -26,37 +26,49 @@ CATEGORIES = [
 client = OpenAI()
 
 
-def categorize(memo):
+def categorize_batch(memos):
     """
-    Takes a transaction memo string and returns the matching bookkeeping category.
+    Takes a list of memos and returns a list of predicted categories using one API call.
     """
-    custom_prompt = f"""
-You are a bookkeeping transaction categorizer.
-Choose the single best category from the list below for the given memo.
-If its not in the list, put "Ask my accountant"
+    formatted_memos = "\n".join(
+        [f"{i+1}. {memo}" for i, memo in enumerate(memos)])
+
+    prompt = f"""
+You are a professional bookkeeping AI. You will categorize memos into the best matching accounting category from the list below.
+
+If a memo clearly does not match any category, respond with "Ask my accountant".
 
 Categories:
 {", ".join(CATEGORIES)}
 
-Memo: "{memo}"
-Only respond with the category name, nothing else.
-    """
-    # resp = client.responses.create(
-    #     model="gpt-4.1-mini",
-    #     temperature=0,
-    #     messages=[
-    #         {"role": "system", "content": "You are a helpful bookkeeping categorization assistant."},
-    #         {"role": "user", "content": custom_prompt}
-    #     ]
-    # )
+Below is a list of memos. Respond with one category per line in the same order, numbered, and nothing else.
 
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=custom_prompt
+Memos:
+{formatted_memos}
+
+Only output the categories like this:
+1. Category
+2. Category
+...
+
+Begin:
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o",  # use GPT-4o or "gpt-3.5-turbo" if you want to save cost
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
     )
-    return response.output_text.strip()
+
+    raw_output = response.choices[0].message.content
+    lines = raw_output.strip().splitlines()
+    categories = [line.split(". ", 1)[1].strip()
+                  for line in lines if ". " in line]
+    return categories
+
 
 # Example usage
 # if __name__ == "__main__":
-#     print(categorize("US CELLULAR PMT #5679 568-901-1345 OH"))  # -> Internet and Phone
-#     print(categorize("DELTA AIRLINES TXN 9832, 800-922-0204, NJ"))  # -> Travel
+    # -> Internet and Phone
+    # print(categorize_batch(["US CELLULAR PMT #5679 568-901-1345 OH","DELTA AIRLINES TXN 9832, 800-922-0204, NJ"]))
+    # print(categorize_batch("DELTA AIRLINES TXN 9832, 800-922-0204, NJ"))  # -> Travel
