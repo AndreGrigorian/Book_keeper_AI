@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import xlsxwriter
 import io  # for in-memory bytes buffer
+import bookkeeper_brain
+
 
 st.title("RoboLedger")
 st.subheader("Your AI-powered financial assistant")
@@ -54,20 +56,20 @@ elif upload_type == "Excel":
                         df.loc[row_index, col] = new_val
                     st.success("Row updated!")
 
-                st.write("### 🔄 Updated DataFrame")
+                st.write("### Updated DataFrame")
                 st.dataframe(df)
                 for col, new_val in updated_values.items():
                     df.loc[row_index, col] = new_val
                 st.success("Row updated!")
 
                 # Optional: add to training data
-                if "Description" in df.columns and "Predicted Account" in df.columns:
+                if "Memo" in df.columns and "Predicted Account" in df.columns:
                     new_training_row = pd.DataFrame([{
-                    "Description": df.loc[row_index, "Description"],
+                    "Description": df.loc[row_index, "Memo"],
                     "Category": df.loc[row_index, "Predicted Account"]
                  }])
-                    update_training_data(new_training_row)
-                    train_and_save_model()
+                    bookkeeper_brain.update_training_data(new_training_row)
+                    bookkeeper_brain.train_and_save_model()
                     st.info("Training data updated and model retrained.")
                 
         except Exception as e:
