@@ -60,15 +60,15 @@ Only respond with the category name, nothing else.
         return response.output_text.strip()
 
     # Predict using Naive Bayes
-    predicted_label = model.predict([input_text])[0]
-    probabilities = model.predict_proba([input_text])[0]
+    predicted_label = model.predict([memo])[0]
+    probabilities = model.predict_proba([memo])[0]
     confidence = max(probabilities)
 
-    if confidence >= threshold:
+    if confidence >= 0.8:
         return predicted_label
     else:
         # Use GPT if confidence is too low
-        response = gpt_client.responses.create(
+        response = client.responses.create(
             model="gpt-4.1-mini",
             input=custom_prompt
         )

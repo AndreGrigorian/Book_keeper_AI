@@ -3,10 +3,35 @@ import pandas as pd
 import bookkeeper_brain
 import classify_transactions
 import data_cleaner
+import base64
 
-st.title("🫨 RoboLedger 🫨")
+st.title("🦍🤖 RoboLedger 🦍🤖")
 st.subheader("Your AI-powered financial assistant")
 st.subheader("Choose a file and view the contents below")
+
+
+def get_base64_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode()
+
+
+# Change this to your local image path
+image_path = "2023-07-17.jpg"
+base64_img = get_base64_image(image_path)
+
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/jpg;base64,{base64_img}");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # --- Upload Type Selection ---
 upload_type = st.radio("Choose file type to upload:", ("PDF", "Excel"))
@@ -24,7 +49,8 @@ if upload_type == "PDF":
 
 # --- Excel Upload ---
 elif upload_type == "Excel":
-    excel_file = st.file_uploader("Upload an Excel file", type=["xlsx", "xls", "csv"])
+    excel_file = st.file_uploader(
+        "Upload an Excel file", type=["xlsx", "xls", "csv"])
 
     if excel_file:
         try:
@@ -35,7 +61,8 @@ elif upload_type == "Excel":
             def preprocess_and_categorize(df_input):
                 df_copy = df_input.copy()
                 df_copy["Memo"] = df_copy["Memo"].apply(data_cleaner.janitor)
-                df_copy["Predicted Account"] = df_copy["Memo"].map(classify_transactions.categorize)
+                df_copy["Predicted Account"] = df_copy["Memo"].map(
+                    classify_transactions.categorize)
                 return df_copy
 
             df = preprocess_and_categorize(df_raw)
@@ -48,16 +75,19 @@ elif upload_type == "Excel":
                 st.subheader("Edit a Row in the Excel File")
 
                 # User input: row index
-                row_index = int(st.text_input("Enter row index to edit", value=int(df.index.min())))
+                row_index = int(st.text_input(
+                    "Enter row index to edit", value=int(df.index.min())))
 
                 # Editable inputs for each column
                 updated_values = {}
                 for col in df.columns:
                     original_val = df.loc[row_index, col]
                     if pd.api.types.is_numeric_dtype(df[col]):
-                        new_val = st.number_input(f"{col}", value=float(original_val), key=f"{col}_{row_index}")
+                        new_val = st.number_input(f"{col}", value=float(
+                            original_val), key=f"{col}_{row_index}")
                     else:
-                        new_val = st.text_input(f"{col}", value=str(original_val), key=f"{col}_{row_index}")
+                        new_val = st.text_input(f"{col}", value=str(
+                            original_val), key=f"{col}_{row_index}")
                     updated_values[col] = new_val
 
                 # Save Changes Button
@@ -79,7 +109,8 @@ elif upload_type == "Excel":
                                 "Description": df.loc[row_index, "Memo"],
                                 "Category": df.loc[row_index, "Predicted Account"]
                             }])
-                            bookkeeper_brain.update_training_data(new_training_row)
+                            bookkeeper_brain.update_training_data(
+                                new_training_row)
                             bookkeeper_brain.train_and_save_model()
                             st.info("Training data updated and model retrained.")
                     else:
