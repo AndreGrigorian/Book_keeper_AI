@@ -18,9 +18,9 @@ CATEGORIES = [
     "Utilities", "Internet and Phone", "Education and Training",
     "Business Dues and Subscriptions", "Vehicle Expenses",
     "Home Office Expenses", "Postage and Shipping",
-    "Software and Online Services",
+    "Software Expense", "Miscelleanous City Taxes",
     "Owner's Draw", "Estimated Tax Payments", "Income Tax Expense",
-    "Payroll Taxes", "Business Loan Interest", "Amortization"
+    "Payroll Taxes", "Business Loan Interest", "Amortization", "Ask My Accountant"
 ]
 
 client = OpenAI()
@@ -33,7 +33,7 @@ def categorize(memo):
     custom_prompt = f"""
 You are a bookkeeping transaction categorizer.
 Choose the single best category from the list below for the given memo.
-If its not in the list, put "Ask my accountant"
+If its not in the list, put "Ask my Accountant"
 
 Categories:
 {", ".join(CATEGORIES)}
