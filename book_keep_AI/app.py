@@ -20,7 +20,8 @@ if upload_type == "PDF":
 
 # Excel Upload
 elif upload_type == "Excel":
-    excel_file = st.file_uploader("Upload an Excel file", type=["xlsx", "xls", "csv"])
+    excel_file = st.file_uploader(
+        "Upload an Excel file", type=["xlsx", "xls", "csv"])
     if excel_file is not None:
         try:
             df = pd.read_excel(excel_file)
