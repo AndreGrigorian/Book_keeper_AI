@@ -1,6 +1,7 @@
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
+import bookkeeper_brain
 
 load_dotenv()  # loads OPENAI_API_KEY from .env
 
@@ -49,12 +50,29 @@ Only respond with the category name, nothing else.
     #         {"role": "user", "content": custom_prompt}
     #     ]
     # )
+    model = bookkeeper_brain.load_model()
+    if model is None:
+        # If no model exists, use GPT directly
+        response = client.responses.create(
+            model="gpt-4.1-mini",
+            input=custom_prompt
+        )
+        return response.output_text.strip()
 
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=custom_prompt
-    )
-    return response.output_text.strip()
+    # Predict using Naive Bayes
+    predicted_label = model.predict([input_text])[0]
+    probabilities = model.predict_proba([input_text])[0]
+    confidence = max(probabilities)
+
+    if confidence >= threshold:
+        return predicted_label
+    else:
+        # Use GPT if confidence is too low
+        response = gpt_client.responses.create(
+            model="gpt-4.1-mini",
+            input=custom_prompt
+        )
+        return response.output_text.strip()
 
 # Example usage
 # if __name__ == "__main__":

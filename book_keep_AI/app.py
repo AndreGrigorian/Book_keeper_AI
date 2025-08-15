@@ -1,77 +1,94 @@
 import streamlit as st
 import pandas as pd
-import xlsxwriter
-import io  # for in-memory bytes buffer
 import bookkeeper_brain
+import classify_transactions
+import data_cleaner
 
-
-st.title("RoboLedger")
+st.title("🫨 RoboLedger 🫨")
 st.subheader("Your AI-powered financial assistant")
 st.subheader("Choose a file and view the contents below")
 
-# Select upload type
+# --- Upload Type Selection ---
 upload_type = st.radio("Choose file type to upload:", ("PDF", "Excel"))
 
-# PDF Upload
+# --- PDF Upload ---
 if upload_type == "PDF":
     pdf_file = st.file_uploader("Upload a PDF file", type="pdf")
-    if pdf_file is not None:
+
+    if pdf_file:
         st.success("PDF uploaded successfully!")
         st.write("File name:", pdf_file.name)
-        # Optional: PDF processing can go here
+        # Optional: Add PDF processing logic here
     else:
         st.info("Please upload a PDF file.")
 
-# Excel Upload
+# --- Excel Upload ---
 elif upload_type == "Excel":
     excel_file = st.file_uploader("Upload an Excel file", type=["xlsx", "xls", "csv"])
-    if excel_file is not None:
-        try:
-            df = pd.read_excel(excel_file)
 
-            st.success("Excel uploaded successfully!")
-            st.write("Preview of Excel data:")
+    if excel_file:
+        try:
+            df_raw = pd.read_excel(excel_file)
+
+            # --- Cached cleaning & categorization ---
+            @st.cache_data
+            def preprocess_and_categorize(df_input):
+                df_copy = df_input.copy()
+                df_copy["Memo"] = df_copy["Memo"].apply(data_cleaner.janitor)
+                df_copy["Predicted Account"] = df_copy["Memo"].map(classify_transactions.categorize)
+                return df_copy
+
+            df = preprocess_and_categorize(df_raw)
+
+            st.success("Excel uploaded and processed successfully!")
+            st.write("Preview of processed data:")
             st.dataframe(df)
 
-            # Proceed if DataFrame is not empty
             if not df.empty:
                 st.subheader("Edit a Row in the Excel File")
 
-                # Select row index manually
+                # User input: row index
                 row_index = int(st.text_input("Enter row index to edit", value=int(df.index.min())))
 
                 # Editable inputs for each column
                 updated_values = {}
                 for col in df.columns:
-                    val = df.loc[row_index, col]
+                    original_val = df.loc[row_index, col]
                     if pd.api.types.is_numeric_dtype(df[col]):
-                        updated = st.number_input(f"{col}", value=float(val), key=f"{col}_{row_index}")
+                        new_val = st.number_input(f"{col}", value=float(original_val), key=f"{col}_{row_index}")
                     else:
-                        updated = st.text_input(f"{col}", value=str(val), key=f"{col}_{row_index}")
-                    updated_values[col] = updated
+                        new_val = st.text_input(f"{col}", value=str(original_val), key=f"{col}_{row_index}")
+                    updated_values[col] = new_val
 
-                # Save changes
+                # Save Changes Button
                 if st.button("Save Changes"):
+                    original_row = df.loc[row_index].copy()
+                    changes_made = False
+
                     for col, new_val in updated_values.items():
-                        df.loc[row_index, col] = new_val
-                    st.success("Row updated!")
+                        if str(original_row[col]) != str(new_val):
+                            df.loc[row_index, col] = new_val
+                            changes_made = True
 
-                st.write("### Updated DataFrame")
-                st.dataframe(df)
-                for col, new_val in updated_values.items():
-                    df.loc[row_index, col] = new_val
-                st.success("Row updated!")
+                    if changes_made:
+                        st.success("Row updated!")
 
-                # Optional: add to training data
-                if "Memo" in df.columns and "Predicted Account" in df.columns:
-                    new_training_row = pd.DataFrame([{
-                    "Description": df.loc[row_index, "Memo"],
-                    "Category": df.loc[row_index, "Predicted Account"]
-                 }])
-                    bookkeeper_brain.update_training_data(new_training_row)
-                    bookkeeper_brain.train_and_save_model()
-                    st.info("Training data updated and model retrained.")
-                
+                        # Update training data if relevant columns exist
+                        if "Memo" in df.columns and "Predicted Account" in df.columns:
+                            new_training_row = pd.DataFrame([{
+                                "Description": df.loc[row_index, "Memo"],
+                                "Category": df.loc[row_index, "Predicted Account"]
+                            }])
+                            bookkeeper_brain.update_training_data(new_training_row)
+                            bookkeeper_brain.train_and_save_model()
+                            st.info("Training data updated and model retrained.")
+                    else:
+                        st.warning("No changes detected. Nothing was updated.")
+
+                    # Show updated DataFrame
+                    st.write("### Updated DataFrame")
+                    st.dataframe(df)
+
         except Exception as e:
             st.error(f"Error reading Excel file: {e}")
     else:
