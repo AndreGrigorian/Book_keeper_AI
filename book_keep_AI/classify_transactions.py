@@ -28,9 +28,6 @@ client = OpenAI()
 
 
 def categorize_batch(memos):
-    """
-    Takes a list of memos and returns a list of predicted categories using one API call.
-    """
 
     formatted_memos = "\n".join(
         [f"{i+1}. {memo}" for i, memo in enumerate(memos)])
@@ -38,7 +35,7 @@ def categorize_batch(memos):
     prompt = f"""
 You are a professional bookkeeping AI. You will categorize memos into the best matching accounting category from the list below.
 
-If a memo clearly does not match any category, respond with "Ask my accountant".
+
 
 
 Categories:
