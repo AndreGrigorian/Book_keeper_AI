@@ -16,3 +16,5 @@ def janitor(text):
     new_text = phone_pattern.sub('', text)
 
     return re.sub(pattern, "", new_text, flags = re.IGNORECASE)
+
+

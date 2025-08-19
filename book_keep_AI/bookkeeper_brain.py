@@ -1,41 +1,82 @@
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.pipeline import make_pipeline
-import joblib
-import os
+import joblib  # for saving/loading model
 
+# Paths to saved model and data
+MODEL_PATH = "model.pkl"
 TRAINING_DATA_PATH = "training_data.csv"
-MODEL_PATH = "naive_bayes_model.pkl"
 
-# 1. Load or create the training dataset
+# Load or initialize training data
 def load_training_data():
-    if os.path.exists(TRAINING_DATA_PATH):
-        return pd.read_csv(TRAINING_DATA_PATH)
-    else:
-        return pd.DataFrame(columns=["Description", "Category"])
+    import os
+    import pandas as pd
 
-# 2. Save new labeled data
-def update_training_data(new_data: pd.DataFrame):
-    existing_data = load_training_data()
-    updated_data = pd.concat([existing_data, new_data], ignore_index=True)
-    updated_data.drop_duplicates(inplace=True)  # Optional
-    updated_data.to_csv(TRAINING_DATA_PATH, index=False)
+    if not os.path.exists(TRAINING_DATA_PATH):
+        return pd.DataFrame(columns=["Memo", "Category"])
 
-# 3. Train and save the model
+    try:
+        df = pd.read_csv(TRAINING_DATA_PATH)
+        if df.empty:
+            return pd.DataFrame(columns=["Memo", "Category"])
+        return df
+    except pd.errors.EmptyDataError:
+        # File exists but empty
+        return pd.DataFrame(columns=["Memo", "Category"])
+
+def save_training_data(df):
+    df.to_csv(TRAINING_DATA_PATH, index=False)
+
+# Update training data with new entries
+def update_training_data(new_data):
+    df_existing = load_training_data()
+    df_combined = pd.concat([df_existing, new_data], ignore_index=True).drop_duplicates()
+    save_training_data(df_combined)
+
+
 def train_and_save_model():
-    data = load_training_data()
-    if len(data) >= 2:  # Avoid training with insufficient data
-        model = make_pipeline(CountVectorizer(), MultinomialNB())
-        model.fit(data["Description"], data["Category"])
-        joblib.dump(model, MODEL_PATH)
-        return model
-    return None
+    df = load_training_data()
+    if df.empty:
+        return
 
-# 4. Load the model
+    # Clean 'Memo' column: convert to string, fill NaNs, strip whitespace
+    df["Memo"] = df["Memo"].fillna("").astype(str).str.strip()
+    df["Category"] = df["Category"].fillna("").astype(str).str.strip()
+
+    # Filter out rows where Memo is empty after stripping
+    df = df[df["Memo"] != ""]
+
+    # Also optionally filter out rows with empty Category
+    df = df[df["Category"] != ""]
+
+    if df.empty:
+        print("No valid training data after filtering empty Memo/Category. Skipping training.")
+        return
+
+    X = df["Memo"]
+    y = df["Category"]
+
+    model = Pipeline([
+        ("tfidf", TfidfVectorizer()),
+        ("clf", LogisticRegression(multi_class="multinomial", solver="lbfgs", max_iter=1000)),
+    ])
+
+    model.fit(X, y)
+    joblib.dump(model, MODEL_PATH)
+
+# Load model for inference
 def load_model():
-    if os.path.exists(MODEL_PATH):
-        return joblib.load(MODEL_PATH)
-    else:
-        return None
+    return joblib.load(MODEL_PATH)
+
+# Predict single input
+def categorize(description):
+    model = load_model()
+    return model.predict([description])[0]
+
+# Predict batch input (for DataFrame .map)
+def categorize_batch(descriptions):
+    model = load_model()
+    return model.predict(descriptions)
+
 

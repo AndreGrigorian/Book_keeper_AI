@@ -1,126 +1,140 @@
 import streamlit as st
 import pandas as pd
-import bookkeeper_brain
-import classify_transactions
-import data_cleaner
-import base64
+from io import BytesIO
+import data_cleaner  # your custom module
+import classify_transactions  # your categorizer module
+import bookkeeper_brain  # your model training module
 
-st.title("🦍🤖 RoboLedger 🦍🤖")
+st.title("🤖 RoboLedger 🤖")
 st.subheader("Your AI-powered financial assistant")
 st.subheader("Choose a file and view the contents below")
 
-
-def get_base64_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode()
-
-
-# Change this to your local image path
-image_path = "2023-07-17.jpg"
-base64_img = get_base64_image(image_path)
-
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image: url("data:image/jpg;base64,{base64_img}");
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # --- Upload Type Selection ---
-upload_type = st.radio("Choose file type to upload:", ("PDF", "Excel"))
+upload_type = st.radio("Choose file type to upload:", ("Excel", "CSV"))
 
-# --- PDF Upload ---
-if upload_type == "PDF":
-    pdf_file = st.file_uploader("Upload a PDF file", type="pdf")
+# Shared preprocessing function
+@st.cache_data
+def preprocess_and_categorize(df_input):
+    df_copy = df_input.copy()
+    df_copy["Memo"] = df_copy["Memo"].apply(data_cleaner.janitor)
+    df_copy["Predicted Account"] = classify_transactions.categorize_batch(df_copy["Memo"])
+    return df_copy
 
-    if pdf_file:
-        st.success("PDF uploaded successfully!")
-        st.write("File name:", pdf_file.name)
-        # Optional: Add PDF processing logic here
+if upload_type == "Excel":
+    uploaded_file = st.file_uploader("Upload an Excel or CSV file", type=["xlsx", "xls", "csv"])
+
+    if uploaded_file:
+        # Initialize or update session state dataframe on new upload
+        if "df" not in st.session_state or st.session_state.get("uploaded_file_name") != uploaded_file.name:
+            try:
+                if uploaded_file.name.endswith((".xlsx", ".xls")):
+                    df_raw = pd.read_excel(uploaded_file)
+                elif uploaded_file.name.endswith(".csv"):
+                    df_raw = pd.read_csv(uploaded_file)
+                else:
+                    st.error("Unsupported file type.")
+                    st.stop()
+                processed_df = preprocess_and_categorize(df_raw)
+                st.session_state.df = processed_df
+                st.session_state.uploaded_file_name = uploaded_file.name
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+                st.stop()
+
+        df = st.session_state.df
+
+        st.success("File uploaded and processed successfully!")
+        st.write("Preview of processed data:")
+        st.dataframe(df)
+
+        # --- Row Editing ---
+        if not df.empty:
+            st.subheader("Edit a Row in the Data")
+            default_row = int(df.index.min())
+            row_index_input = st.text_input("Enter row index to edit", value=str(default_row))
+
+            try:
+                row_index = int(row_index_input)
+                if row_index not in df.index:
+                    st.warning(f"Row index {row_index} not found. Using default {default_row}.")
+                    row_index = default_row
+            except ValueError:
+                st.warning("Invalid row index input. Using default.")
+                row_index = default_row
+
+            updated_values = {}
+            for col in df.columns:
+                original_value = df.at[row_index, col]
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    new_val = st.number_input(f"{col}", value=float(original_value), key=f"{col}_{row_index}")
+                else:
+                    new_val = st.text_input(f"{col}", value=str(original_value), key=f"{col}_{row_index}")
+                updated_values[col] = new_val
+
+            if st.button("Save Changes"):
+                changes_made = False
+                original_row = df.loc[row_index].copy()
+
+                for col, new_val in updated_values.items():
+                    # Convert number inputs back to original dtype if needed
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        # Convert new_val to correct numeric type, for example float or int
+                        if pd.api.types.is_integer_dtype(df[col]):
+                            try:
+                                new_val = int(new_val)
+                            except:
+                                new_val = float(new_val)
+                        else:
+                            new_val = float(new_val)
+
+                    if original_row[col] != new_val:
+                        df.at[row_index, col] = new_val
+                        changes_made = True
+
+                if changes_made:
+                    st.session_state.df = df  # Update session state df
+                    st.success("Row updated!")
+                else:
+                    st.warning("No changes detected.")
+
+            st.write("### Current DataFrame")
+            st.dataframe(st.session_state.df)
+
+            # --- Save All to Training Data ---
+            st.subheader("📥 Save All Processed Data to Training Set")
+            st.caption("Saving the data will fine-tune the model tailored for your business.")
+            if st.button("Save All to Training Data"):
+                if {"Memo", "Predicted Account"}.issubset(df.columns):
+                    training_data = df[["Memo", "Predicted Account"]].rename(
+                        columns={"Memo": "Description", "Predicted Account": "Category"}
+                    )
+                    bookkeeper_brain.update_training_data(training_data)
+                    bookkeeper_brain.train_and_save_model()
+                    st.success("All data saved and model retrained.")
+                else:
+                    st.error("Required columns ('Memo', 'Predicted Account') missing.")
+
     else:
-        st.info("Please upload a PDF file.")
+        st.info("Please upload a file.")
 
-# --- Excel Upload ---
-elif upload_type == "Excel":
-    excel_file = st.file_uploader(
-        "Upload an Excel file", type=["xlsx", "xls", "csv"])
-
-    if excel_file:
+elif upload_type == "CSV":
+    uploaded_csv = st.file_uploader("Upload a CSV file", type=["csv"])
+    if uploaded_csv:
         try:
-            df_raw = pd.read_excel(excel_file)
-
-            # --- Cached cleaning & categorization ---
-            @st.cache_data
-            def preprocess_and_categorize(df_input):
-                df_copy = df_input.copy()
-                df_copy["Memo"] = df_copy["Memo"].apply(data_cleaner.janitor)
-                df_copy["Predicted Account"] = df_copy["Memo"].map(
-                    classify_transactions.categorize)
-                return df_copy
-
+            df_raw = pd.read_csv(uploaded_csv)
             df = preprocess_and_categorize(df_raw)
+            st.session_state.df = df
+            st.session_state.uploaded_file_name = uploaded_csv.name
 
-            st.success("Excel uploaded and processed successfully!")
-            st.write("Preview of processed data:")
+            st.success("CSV uploaded and processed successfully!")
             st.dataframe(df)
 
-            if not df.empty:
-                st.subheader("Edit a Row in the Excel File")
-
-                # User input: row index
-                row_index = int(st.text_input(
-                    "Enter row index to edit", value=int(df.index.min())))
-
-                # Editable inputs for each column
-                updated_values = {}
-                for col in df.columns:
-                    original_val = df.loc[row_index, col]
-                    if pd.api.types.is_numeric_dtype(df[col]):
-                        new_val = st.number_input(f"{col}", value=float(
-                            original_val), key=f"{col}_{row_index}")
-                    else:
-                        new_val = st.text_input(f"{col}", value=str(
-                            original_val), key=f"{col}_{row_index}")
-                    updated_values[col] = new_val
-
-                # Save Changes Button
-                if st.button("Save Changes"):
-                    original_row = df.loc[row_index].copy()
-                    changes_made = False
-
-                    for col, new_val in updated_values.items():
-                        if str(original_row[col]) != str(new_val):
-                            df.loc[row_index, col] = new_val
-                            changes_made = True
-
-                    if changes_made:
-                        st.success("Row updated!")
-
-                        # Update training data if relevant columns exist
-                        if "Memo" in df.columns and "Predicted Account" in df.columns:
-                            new_training_row = pd.DataFrame([{
-                                "Description": df.loc[row_index, "Memo"],
-                                "Category": df.loc[row_index, "Predicted Account"]
-                            }])
-                            bookkeeper_brain.update_training_data(
-                                new_training_row)
-                            bookkeeper_brain.train_and_save_model()
-                            st.info("Training data updated and model retrained.")
-                    else:
-                        st.warning("No changes detected. Nothing was updated.")
-
-                    # Show updated DataFrame
-                    st.write("### Updated DataFrame")
-                    st.dataframe(df)
+            # Add similar editing/exporting logic here if needed.
 
         except Exception as e:
-            st.error(f"Error reading Excel file: {e}")
+            st.error(f"Error reading CSV file: {e}")
     else:
-        st.info("Please upload an Excel file.")
+        st.info("Please upload a CSV file.")
+
+
+

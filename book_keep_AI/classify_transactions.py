@@ -66,9 +66,9 @@ Begin:
                   for line in lines if ". " in line]
     return categories
 
-
 # Example usage
-# if __name__ == "__main__":
+if __name__ == "__main__":
     # -> Internet and Phone
-    # print(categorize_batch(["US CELLULAR PMT #5679 568-901-1345 OH","DELTA AIRLINES TXN 9832, 800-922-0204, NJ"]))
-    # print(categorize_batch("DELTA AIRLINES TXN 9832, 800-922-0204, NJ"))  # -> Travel
+    print(categorize_batch(["US CELLULAR PMT #5679 568-901-1345 OH","DELTA AIRLINES TXN 9832, 800-922-0204, NJ"]))
+    print(categorize_batch("DELTA AIRLINES TXN 9832, 800-922-0204, NJ"))  # -> Travel
+
