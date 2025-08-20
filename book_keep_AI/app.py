@@ -4,20 +4,27 @@ from io import BytesIO
 import data_cleaner  # your custom module
 import classify_transactions  # your categorizer module
 import bookkeeper_brain  # your model training module
+import os
+
 
 st.title("🤖 RoboLedger 🤖")
 st.subheader("Your AI-powered financial assistant")
 st.subheader("Choose a file and view the contents below")
 
 # --- Upload Type Selection ---
-upload_type = st.radio("Choose file type to upload:", ("Excel", "CSV"))
+upload_type = st.radio("Choose file type to upload:", ("Excel"))
 
 # Shared preprocessing function
 @st.cache_data
 def preprocess_and_categorize(df_input):
     df_copy = df_input.copy()
     df_copy["Memo"] = df_copy["Memo"].apply(data_cleaner.janitor)
-    df_copy["Predicted Account"] = classify_transactions.categorize_batch(df_copy["Memo"])
+    if os.path.exists(bookkeeper_brain.MODEL_PATH):
+        df_copy['Predicted Account'] = bookkeeper_brain.categorize_batch(df_copy['Memo'])
+        mask = df_copy["Memo"].notna()
+        df_copy.loc[mask, "Predicted Account"] = classify_transactions.categorize_batch(df_copy.loc[mask, "Memo"])
+    else:
+        df_copy['Predicted Account'] = classify_transactions.categorize_batch(df_copy['Memo'])
     return df_copy
 
 if upload_type == "Excel":
@@ -102,7 +109,7 @@ if upload_type == "Excel":
 
             # --- Save All to Training Data ---
             st.subheader("📥 Save All Processed Data to Training Set")
-            st.caption("Saving the data will fine-tune the model tailored for your business.")
+            st.caption("Saving the data will fine-tune the model tailored for your business. The Model will start working once teh number of transactions are greater than 100. This is done because intializing a model with little transactions forces the model to overgeneralize.")
             if st.button("Save All to Training Data"):
                 if {"Memo", "Predicted Account"}.issubset(df.columns):
                     training_data = df[["Memo", "Predicted Account"]].rename(
@@ -116,25 +123,5 @@ if upload_type == "Excel":
 
     else:
         st.info("Please upload a file.")
-
-elif upload_type == "CSV":
-    uploaded_csv = st.file_uploader("Upload a CSV file", type=["csv"])
-    if uploaded_csv:
-        try:
-            df_raw = pd.read_csv(uploaded_csv)
-            df = preprocess_and_categorize(df_raw)
-            st.session_state.df = df
-            st.session_state.uploaded_file_name = uploaded_csv.name
-
-            st.success("CSV uploaded and processed successfully!")
-            st.dataframe(df)
-
-            # Add similar editing/exporting logic here if needed.
-
-        except Exception as e:
-            st.error(f"Error reading CSV file: {e}")
-    else:
-        st.info("Please upload a CSV file.")
-
-
-
+else:
+    st.info("The file type you have uploaded is not supported")
