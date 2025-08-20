@@ -17,4 +17,8 @@ def janitor(text):
 
     return re.sub(pattern, "", new_text, flags = re.IGNORECASE)
 
-
+def normalize_memo(text):
+    text = str(text).lower().strip()
+    text = re.sub(r'[^\w\s]', '', text)     # remove punctuation
+    text = re.sub(r'\s+', ' ', text)        # collapse extra whitespace
+    return text

@@ -4,7 +4,8 @@ import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
-
+import data_cleaner
+import re
 
 # File paths
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
@@ -37,11 +38,13 @@ def update_training_data(new_data):
 
 def train_and_save_model():
     df = load_training_data()
-
-    # Optional support if some files use 'Description' instead of 'Memo'
+    if len(df) == 100:
+        return None  # No need to train if we already have enough data
+    # Handle alternate column names
     if 'Description' in df.columns:
         df['Memo'] = df['Description']
 
+    # Clean and filter
     df["Memo"] = df["Memo"].fillna("").astype(str).str.strip()
     df["Category"] = df["Category"].fillna("").astype(str).str.strip()
     df = df[(df["Memo"] != "") & (df["Category"] != "")]
@@ -49,12 +52,15 @@ def train_and_save_model():
     if df.empty:
         raise ValueError("❌ No valid training data found. Cannot train model.")
 
+    # ✅ Normalize memos
+    df["Memo"] = df["Memo"].apply(data_cleaner.normalize_memo)
+
     X = df["Memo"]
     y = df["Category"]
 
     model = Pipeline([
-    ("tfidf", TfidfVectorizer(min_df=1, ngram_range=(1, 2))),
-    ("clf", MultinomialNB()),
+        ("tfidf", TfidfVectorizer(min_df=5, ngram_range=(1, 2))),
+        ("clf", MultinomialNB()),
     ])
 
     model.fit(X, y)
@@ -73,9 +79,8 @@ def load_model(model_path=None):
     return model
 
 
-def categorize_batch(memos, model_path=None, threshold=0.2):
+def categorize_batch(memos, model_path=None, threshold=0.8):
     model = load_model(model_path)
-
     try:
         probs = model.predict_proba(memos)
         preds = model.predict(memos)
@@ -84,3 +89,12 @@ def categorize_batch(memos, model_path=None, threshold=0.2):
         results = model.predict(memos)
 
     return results
+
+
+def get_scores(memos, model_path=None):
+    model = load_model(model_path)
+    try:
+        probs = model.predict_proba(memos)
+        return {memo: float(prob.max()) for memo, prob in zip(memos, probs)}
+    except AttributeError:
+        return {memo: 1.0 for memo in memos}

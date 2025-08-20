@@ -8,28 +8,79 @@ import os
 
 
 st.title("🤖 RoboLedger 🤖")
-st.subheader("Your AI-powered financial assistant")
+st.subheader("📚📚 Your AI-powered financial assistant 📚📚")
 st.subheader("Choose a file and view the contents below")
 
 # --- Upload Type Selection ---
 upload_type = st.radio("Choose file type to upload:", ("Excel"))
+st.markdown("---")
+st.subheader("🔍 Reconciliation Check")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    starting_balance = st.number_input("🏁 Starting Balance", value=0.0)
+
+with col2:
+    ending_balance = st.number_input("🏁 Ending Balance", value=0.0)
+
+reconciliation_result = None
+
+if "df" in st.session_state:
+        df = st.session_state.df
+        if "Amount" in df.columns:
+            total_activity = df["Amount"].sum()
+            expected_ending = starting_balance + total_activity
+            reconciled = abs(expected_ending - ending_balance) < 0.01  # tolerance for rounding
+
+            st.write(f"**Total Activity (sum of Amount column):** {total_activity:,.2f}")
+            st.write(f"**Expected Ending Balance:** {expected_ending:,.2f}")
+            st.write(f"**Provided Ending Balance:** {ending_balance:,.2f}")
+
+            if reconciled:
+                st.success("✅ Reconciled! Ending balance matches the expected total.")
+            else:
+                st.error("❌ Not Reconciled. Please check your entries or data.")
+        else:
+            st.warning("⚠️ Column 'Amount' not found in uploaded data. Cannot perform reconciliation.")
+else:
+        pass
 
 # Shared preprocessing function
 @st.cache_data
 def preprocess_and_categorize(df_input):
     df_copy = df_input.copy()
-    df_copy["Memo"] = df_copy["Memo"].apply(data_cleaner.janitor)
+
+    # Clean and normalize memos
+    df_copy["Memo"] = df_copy["Memo"].fillna("").astype(str).apply(data_cleaner.janitor)
+    df_copy["Memo"] = df_copy["Memo"].str.upper()  # Convert to uppercase for consistency
+    memos = df_copy["Memo"].tolist()
+
     if os.path.exists(bookkeeper_brain.MODEL_PATH):
-        df_copy['Predicted Account'] = bookkeeper_brain.categorize_batch(df_copy['Memo'])
-        mask = df_copy["Memo"].notna()
-        df_copy.loc[mask, "Predicted Account"] = classify_transactions.categorize_batch(df_copy.loc[mask, "Memo"])
+        # Primary prediction
+        primary_preds = bookkeeper_brain.categorize_batch(memos)
     else:
-        df_copy['Predicted Account'] = classify_transactions.categorize_batch(df_copy['Memo'])
+        primary_preds = [None] * len(memos)  # fallback mode only
+
+    # Fallback prediction
+    fallback_preds = classify_transactions.categorize_batch(memos)
+
+    # Combine: use primary if not None/empty, else fallback
+    final_preds = [
+        primary if primary not in [None, "", "unknown"]
+        else fallback
+        for primary, fallback in zip(primary_preds, fallback_preds)
+    ]
+
+    df_copy["Predicted Account"] = final_preds
+
     return df_copy
+
+
 
 if upload_type == "Excel":
     uploaded_file = st.file_uploader("Upload an Excel or CSV file", type=["xlsx", "xls", "csv"])
-
+    
     if uploaded_file:
         # Initialize or update session state dataframe on new upload
         if "df" not in st.session_state or st.session_state.get("uploaded_file_name") != uploaded_file.name:
