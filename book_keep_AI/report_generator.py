@@ -1,14 +1,12 @@
 import re
 import pandas as pd
 from io import BytesIO
+import streamlit as st
 
 
-import pandas as pd
-from io import BytesIO
-
-INCOME_KEYWORDS = ["sales", "revenue", "income"]
 
 def is_income(category):
+    INCOME_KEYWORDS = ["sales", "revenue", "income"]
     return any(keyword in category.lower() for keyword in INCOME_KEYWORDS)
 
 def excel_template_generator(df):
@@ -109,7 +107,8 @@ def excel_template_generator(df):
 
     # Optional: Write full raw data to a second sheet
     df.to_excel(writer, index=False, sheet_name='Report')
-
-    writer.save()
+    writer.close()
     processed_data = output.getvalue()
     return processed_data # Return raw bytes
+
+
