@@ -5,29 +5,11 @@ import bookkeeper_brain
 
 load_dotenv()  # loads OPENAI_API_KEY from .env
 
-CATEGORIES = [
-    "Sales Revenue", "Service Income", "Other Income",
-    "Cost of Goods Sold", "Purchases", "Materials and Supplies",
-    "Subcontractor Costs", "Freight and Shipping (COGS related)",
-    "Advertising", "Bank Fees", "Contract Labor",
-    "Depreciation Expense", "Insurance (Business)", "Interest Expense",
-    "Legal and Professional Fees", "Office Supplies",
-    "Rent or Lease - Vehicles, Machinery, Equipment",
-    "Rent or Lease - Other Business Property",
-    "Repairs and Maintenance", "Salaries and Wages",
-    "Taxes and Licenses", "Travel", "Meals and Entertainment",
-    "Utilities", "Internet and Phone", "Education and Training",
-    "Business Dues and Subscriptions", "Vehicle Expenses",
-    "Home Office Expenses", "Postage and Shipping",
-    "Software Expense", "Miscelleanous City Taxes",
-    "Owner's Draw", "Estimated Tax Payments", "Income Tax Expense",
-    "Payroll Taxes", "Business Loan Interest", "Amortization", "Ask My Accountant"
-]
 
 client = OpenAI()
 
 
-def categorize_batch(memos):
+def categorize_batch(memos, CATEGORIES):
 
     formatted_memos = "\n".join(
         [f"{i+1}. {memo}" for i, memo in enumerate(memos)])
@@ -66,9 +48,4 @@ Begin:
                   for line in lines if ". " in line]
     return categories
 
-# Example usage
-if __name__ == "__main__":
-    # -> Internet and Phone
-    print(categorize_batch(["US CELLULAR PMT #5679 568-901-1345 OH","DELTA AIRLINES TXN 9832, 800-922-0204, NJ"]))
-    print(categorize_batch("DELTA AIRLINES TXN 9832, 800-922-0204, NJ"))  # -> Travel
 

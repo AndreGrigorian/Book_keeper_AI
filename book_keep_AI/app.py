@@ -9,9 +9,42 @@ import report_generator  # your report generation module
 from streamlit_option_menu import option_menu
 
 
+def extract_categories_from_uploaded_chart(uploaded_file):
+    try:
+        # ✅ FIX: Check if it's a list and grab the first file
+        if isinstance(uploaded_file, list):
+            uploaded_file = uploaded_file[0]
+
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
+
+        # Try to auto-detect the category column
+        category_column = None
+        for col in df.columns:
+            if "category" in col.lower():
+                category_column = col
+                break
+
+        if category_column is None:
+            st.warning("Could not detect a 'Category' column. Please make sure your file has one.")
+            return None
+
+        categories = df[category_column].dropna().unique().tolist()
+        categories = [str(cat).strip() for cat in categories if isinstance(cat, str)]
+        return categories
+
+    except Exception as e:
+        st.error(f"Error reading file: {e}")
+        return None
+
+
+
+
 def run():
 
-    tab1, tab2, tab3 = st.tabs(["Main", "Receipt Categorizer", "About Section"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Main", "Receipt Categorizer", "About Section", "Analytics"])
     st.markdown(
     """
     <style>
@@ -25,19 +58,53 @@ def run():
     """,
     unsafe_allow_html=True
     )
+    
+
     with st.sidebar:
-        selected = option_menu("Chart of Accounts", ["Default", 'Upload Custom'], 
-        icons=['pip-fill', 'bi bi-upload'], menu_icon="Journal bookmark", default_index=1)
-        selected
+        selected = option_menu("Chart of Accounts", ["Default", "Upload Custom"],
+                            icons=['pip-fill', 'bi bi-upload'], menu_icon="Journal bookmark", default_index=1)
+
+        categories = []
+
         if selected == "Upload Custom":
             uploaded_file = st.file_uploader("Upload Custom Chart of Accounts", type=["xlsx", "xls", "csv"], key="custom_upload")
+            if uploaded_file:
+                categories = extract_categories_from_uploaded_chart(uploaded_file)
+                if categories:
+                    st.success(f"Loaded {len(categories)} custom categories.")
+                    st.write(categories)
+                else:
+                    st.error("⚠️ Failed to load categories. Using default categories instead.")
+        if not categories:
+            categories = [  # Default list
+                "Sales Revenue", "Service Income", "Other Income", "Cost of Goods Sold", "Purchases",
+                "Materials and Supplies", "Subcontractor Costs", "Freight and Shipping (COGS related)",
+                "Advertising", "Bank Fees", "Contract Labor", "Depreciation Expense", "Insurance (Business)",
+                "Interest Expense", "Legal and Professional Fees", "Office Supplies",
+                "Rent or Lease - Vehicles, Machinery, Equipment", "Rent or Lease - Other Business Property",
+                "Repairs and Maintenance", "Salaries and Wages", "Taxes and Licenses", "Travel",
+                "Meals and Entertainment", "Utilities", "Internet and Phone", "Education and Training",
+                "Business Dues and Subscriptions", "Vehicle Expenses", "Home Office Expenses",
+                "Postage and Shipping", "Software Expense", "Miscelleanous City Taxes", "Owner's Draw",
+                "Estimated Tax Payments", "Income Tax Expense", "Payroll Taxes", "Business Loan Interest",
+                "Amortization", "Ask My Accountant"
+            ]
+
         st.markdown("---")
         st.markdown("### 👨‍💻 How RoboLedger Works For YOU! 👨‍💻")
-        st.markdown("In order for RoboLedger to work, the documents you upload must have follow our formating guidelines. Chart of Accounts must be in a single column with the header 'Category'. Transaction documents must have at least the following columns: 'Date', 'Memo', and 'Amount'.")
-        st.markdown("---")  # optional divider line
-    
-        if st.button("💖 Donate to Us"):
+        st.markdown("Chart of Accounts must be in a single column with the header 'Category'.")
+        st.markdown("Transaction documents must have at least 'Date', 'Memo', and 'Amount' columns.")
+        st.markdown("---")
+        
+        if st.button("💖 Donate to Us 💖"):
             st.markdown("Thank you for considering a donation! Please visit [WEBSITE] to support our work.")
+
+
+
+
+
+
+
     def main_run():
         st.subheader("📚 Your AI-powered financial assistant 📚")
         # st.subheader("Choose a file and view the contents below")
@@ -94,7 +161,7 @@ def run():
                 primary_preds = [None] * len(memos)  # fallback mode only
 
             # Fallback prediction
-            fallback_preds = classify_transactions.categorize_batch(memos)
+            fallback_preds = classify_transactions.categorize_batch(memos, categories)
 
             # Combine: use primary if not None/empty, else fallback
             final_preds = [
@@ -236,3 +303,6 @@ def run():
         st.write("RoboLedger not only categorizes transactions but also provides reconciliation checks. The team of developers are currently working on invoice and receipt processing, expense tracking, and financial reporting features. This will allow you to manage your finances comprehensively, all in one platform.")
         st.write("**How can I contribute to RoboLedger?**")
         st.write("We welcome contributions to RoboLedger! You can help by providing feedback, suggesting features, or even contributing code. If you're interested in collaborating, please reach out to us through our GitHub repository or contact us directly. Your input is invaluable in making RoboLedger better for everyone.")
+    with tab4:
+        st.write("This tab is for analytics and visualizations.")
+        st.write("More features coming soon!")
