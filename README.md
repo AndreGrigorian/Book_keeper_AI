@@ -2,7 +2,7 @@
 
 Bookkeeping is the tedious process of categorizing transactions into their respective accounts.   This project looks to reduce the repetitive nature of bookkeeping by leveraging AI to reduce manual data entry.
 
-### **How does RoboLedger Work? **
+### **How does RoboLedger Work?**
 
 RoboLedger uses two models in order to automate bookkeeping. The first one is a baseline model that uses a dictionary of potential accounts depending on vendor memos. As the user adds more and more transactions into the database, these transactions are added into a Naive Bayes Model. The Naive Bayes Model overfit bias was minimized by making $n$ = 100. When the Naive Bayes Model reaches a confidence level $\geq$ 0.08, the Naive Bayes Model overrides the baseline model. This means that RoboLedger learns from User and gets better as time passes on.
 
@@ -18,9 +18,13 @@ RoboLedger is for everyone. However, businesses that can't afford a bookkeeping 
 
 RoboLedger is a beta version of a grand project being developed. Since RoboLedger is made for small businesses, we like to keep the costs of the project as $0. However, we do accept donations. Donations as small as $1 help motivate our team to develop more tools for the general public to use. Your donations help us help you.
 
-##### *"RoboLedger for all"*
+### Upcoming features:
 
-# Credit Goes to: Andre Grigorian and Aidan Pineda
+1) User-friendly UI 👥
+2) Carryover Profit & Loss 🗂️
+3) Analytics Page 📈
+
+### Credit Goes to: Andre Grigorian and Aidan Pineda
 
 
    
