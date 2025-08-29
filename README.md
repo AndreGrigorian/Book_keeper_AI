@@ -19,18 +19,25 @@ RoboLedger is for everyone. However, businesses that can't afford a bookkeeping 
 
 RoboLedger is a beta version of a grand project being developed. Since RoboLedger is made for small businesses, we like to keep the costs of the project as $0. However, we do accept donations. Donations as small as $1 help motivate our team to develop more tools for the general public to use. Your donations help us help you.
 
-### Upcoming features:
+### ⚠️ Upcoming features ⚠️:
 
-### 1) User-friendly UI 👥: constant updates by development teams are looking to make layout of app become more accessible and easy to navigate. The goal is to have a User Interface that is so simple that zero accounting experience is needed to navigate the webpage and understand RoboLedger.
+### 1) User-friendly UI 👥: 
 
-### 2) Carryover Profit & Loss 🗂️: At the moment the transactions are temporarily stored into our database. However, work is being done so users can return with new transactions and have them added to their profit & loss.
+constant updates by development teams are looking to make layout of app become more accessible and easy to navigate. The goal is to have a User Interface that is so simple that zero accounting experience is needed to navigate the webpage and understand RoboLedger.
 
-### 3) Analytics Page 📈: Dashboards, KPIs, Profitability indices, all these will be made available very soon
+### 2) Carryover Profit & Loss 🗂️: 
+
+At the moment the transactions are temporarily stored into our database. However, work is being done so users can return with new transactions and have them added to their profit & loss.
+
+### 3) Analytics Page 📈: 
+
+Dashboards, KPIs, Profitability indices, all these will be made available very soon
 
 | Type     | Time        | Cost |
 |-------------|--------------------|--------------------|
 | RoboLedger        |   ~3 secs     | $0 |
 | Bookkeeper | ~40 mins    | ~$300 to $900 |
+
 
 
 
