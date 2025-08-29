@@ -7,7 +7,8 @@ import bookkeeper_brain  # your model training module
 import os
 import report_generator  # your report generation module
 from streamlit_option_menu import option_menu
-
+import plotly.express as px
+import seaborn as sns
 
 def extract_categories_from_uploaded_chart(uploaded_file):
     try:
@@ -44,15 +45,22 @@ def extract_categories_from_uploaded_chart(uploaded_file):
 
 def run():
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Main", "Receipt Categorizer", "About Section", "Analytics"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Main", "Help", "About", "Analytics"])
     st.markdown(
     """
     <style>
-        [data-testid="stSidebar"] {
-            width: 500px !important;
+        /* When sidebar is open */
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            width: 450px !important;
         }
-        [data-testid="stSidebar"] > div:first-child {
-            width: 500px !important;
+
+        [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
+            width: 450px !important;
+        }
+
+        /* When sidebar is collapsed */
+        [data-testid="stSidebar"][aria-expanded="false"] {
+            transform: translateX(-100%) !important;
         }
     </style>
     """,
@@ -92,8 +100,14 @@ def run():
 
         st.markdown("---")
         st.markdown("### 👨‍💻 How RoboLedger Works For YOU! 👨‍💻")
-        st.markdown("Chart of Accounts must be in a single column with the header 'Category'.")
-        st.markdown("Transaction documents must have at least 'Date', 'Memo', and 'Amount' columns.")
+        st.markdown("RoboLedger is your AI-powered bookkeeping assistant, designed to simplify your financial management. Here's how it works:")
+        st.markdown("We have two AI models working together to categorize your transactions accurately.")
+        st.markdown("One baseline model which is able to categorize everything regardless of prior information.")
+        st.markdown("One custom model which learns from your specific business data to provide tailored categorizations.")
+        st.markdown("When you upload your transaction data, RoboLedger first uses the custom model to categorize your transactions based on patterns it has learned from your previous data.")
+        st.markdown("If the custom model is unsure about a transaction or if it hasn't seen similar data before, it falls back to the baseline model to ensure every transaction is categorized.")
+        st.markdown("This dual-model approach ensures that you get the most accurate and relevant categorizations possible, helping you maintain clear and organized financial records.")
+        st.markdown("Our mission: make bookkeeping something that should take a couple of clicks, not hours.")
         st.markdown("---")
         
         if st.button("💖 Donate to Us 💖"):
@@ -258,7 +272,7 @@ def run():
 
                     # --- Save All to Training Data ---
                     st.subheader("📥 Save All Processed Data to Training Set")
-                    st.caption("Saving the data will fine-tune the model tailored for your business. The Model will start working once teh number of transactions are greater than 100. This is done because intializing a model with little transactions forces the model to overgeneralize.")
+                    st.caption("Saving the data will fine-tune the model tailored for your business. The Model will start working once the number of transactions are greater than 100. This is done because intializing a model with little transactions forces the model to overgeneralize.")
                     if st.button("Save All to Training Data"):
                         if {"Memo", "Predicted Account"}.issubset(df.columns):
                             training_data = df[["Memo", "Predicted Account"]].rename(
@@ -270,6 +284,8 @@ def run():
                         else:
                             st.error("Required columns ('Memo', 'Predicted Account') missing.")
                     try:
+                        st.subheader("🏦 Download Profit & Loss Excel Template 🏦")
+                        st.caption("Download a Profit & Loss Excel template based on your categorized transactions. You do not need to fill out the template, it is automatically generated based on your transactions. You can use this for filing your taxes or for your accounting purposes.")
                         excel_bytes = report_generator.excel_template_generator(df)
 
                         # Create a download button
@@ -291,7 +307,13 @@ def run():
         main_run()
 
     with tab2:
-        st.write("This tab is for categorizing receipts and transactions.")
+        st.subheader(" How to Use RoboLedger ")
+        st.write("1. **Upload Chart of Accounts**: Start by uploading your custom Chart of Accounts in the sidebar. Ensure the file has a single column named 'Category'. If you don't upload one, the default categories will be used.")
+        st.write("2. **Upload Transaction File**: Choose the file type (Excel or QBO) and upload your transaction data. The file should contain at least 'Date', 'Memo', and 'Amount' columns.")
+        st.write("3. **Reconciliation Check**: Input your starting and ending balances to verify that your transactions reconcile correctly.")
+        st.write("4. **Review and Edit Transactions**: After uploading, review the categorized transactions. You can edit any row directly within the app to correct misclassifications.")
+        st.write("5. **Save to Training Data**: Once you're satisfied with the categorizations, save the processed data to the training set. This will help fine-tune the AI model for your specific business needs.")
+        st.write("6. **Download Reports**: Finally, download the generated Profit & Loss Excel template for your records.")
         
         
 
@@ -304,5 +326,57 @@ def run():
         st.write("**How can I contribute to RoboLedger?**")
         st.write("We welcome contributions to RoboLedger! You can help by providing feedback, suggesting features, or even contributing code. If you're interested in collaborating, please reach out to us through our GitHub repository or contact us directly. Your input is invaluable in making RoboLedger better for everyone.")
     with tab4:
-        st.write("This tab is for analytics and visualizations.")
-        st.write("More features coming soon!")
+        if "df" in st.session_state:
+            df = st.session_state.df
+            account_summary = df["Predicted Account"].value_counts().reset_index()
+            account_summary.columns = ["Predicted Account", "Count"]
+            account_counts = df["Predicted Account"].value_counts().reset_index()
+            account_counts.columns = ["Predicted Account", "Count"]
+            if not df.empty:
+                try:
+                    fig = px.histogram(
+                        df,
+                        x="Amount",
+                        nbins=30,
+                        marginal="box",  
+                        title="Transaction Amount Distribution",
+                    )
+                    fig.update_layout(
+                        xaxis_title="Amount",
+                        yaxis_title="Frequency",
+                        bargap=0.1,
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    fig = px.pie(
+                    account_summary,
+                    names="Predicted Account",
+                    values="Count",
+                    title="Transaction Count per Account",
+                    hole=0.4  # Optional: makes it a donut chart
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    fig = px.bar(
+                    account_counts,
+                    x="Predicted Account",
+                    y="Count",
+                    title="Frequency of Predicted Accounts",
+                    text="Count",
+                    color="Predicted Account"  # Optional: adds color by category
+                    )
+
+                    fig.update_layout(
+                        xaxis_title="Predicted Account",
+                        yaxis_title="Frequency",
+                        showlegend=False
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                except Exception as e:
+                    st.error(f"Error generating plot: {e}")
+            else:
+                st.info("No data available for analytics. Please upload and process a file first.")
+        else:
+            st.info("No data available for analytics. Please upload and process a file first.")
