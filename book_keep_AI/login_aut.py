@@ -6,7 +6,7 @@ from yaml.loader import SafeLoader
 import os
 import app as main_app
 # Load the YAML config
-with open(r'C:\Users\felix\bookkeeper_ai\Book_keeper_AI\book_keep_AI\config.yaml') as file:
+with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
 # Create the authenticator (✅ removed deprecated 'pre-authorized')
@@ -57,6 +57,3 @@ if st.session_state.get('authentication_status'):
     main_app.run()  # Call the main app function
 elif st.session_state.get('authentication_status') is False:
     st.error('Username/password is incorrect')
-
-
-
