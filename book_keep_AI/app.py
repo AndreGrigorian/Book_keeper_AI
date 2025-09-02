@@ -295,44 +295,6 @@ def run():
     with tab2:
         df = st.session_state.get("df")
         # ----
-        st.subheader("🔍 Reconciliation Check")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            starting_balance = st.number_input(
-                "🏁 Starting Balance 🏁", value=0.0)
-
-        with col2:
-            ending_balance = st.number_input("🏁 Ending Balance 🏁", value=0.0)
-
-        reconciliation_result = None
-
-        if "df" in st.session_state:
-            df = st.session_state.df
-            if "Amount" in df.columns:
-                total_activity = df["Amount"].sum()
-                expected_ending = starting_balance + total_activity
-                # tolerance for rounding
-                reconciled = abs(expected_ending - ending_balance) < 0.01
-
-                st.write(
-                    f"**Total Activity (sum of Amount column):** {total_activity:,.2f}")
-                st.write(
-                    f"**Expected Ending Balance:** {expected_ending:,.2f}")
-                st.write(f"**Provided Ending Balance:** {ending_balance:,.2f}")
-
-                if reconciled:
-                    st.success(
-                        "✅ Reconciled! Ending balance matches the expected total.")
-                else:
-                    st.error(
-                        "❌ Not Reconciled. Please check your entries or data.")
-            else:
-                st.warning(
-                    "⚠️ Column 'Amount' not found in uploaded data. Cannot perform reconciliation.")
-        else:
-            pass
         # ---
 
         if isinstance(df, pd.DataFrame) and not df.empty:
