@@ -9,6 +9,7 @@ import report_generator  # your report generation module
 from streamlit_option_menu import option_menu
 import plotly.express as px
 import seaborn as sns
+from pathlib import Path
 
 
 def extract_categories_from_uploaded_chart(uploaded_file):
@@ -118,6 +119,9 @@ def run():
             "Our mission: make bookkeeping something that should take a couple of clicks, not hours.")
         st.markdown("---")
 
+        FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeCHmPbM_RR1_rgu13Zuobka3GmImsfXLceqX7F--QaVc89gg/viewform"
+        st.link_button("📝 Leave feedback", FEEDBACK_URL,
+                       use_container_width=False)
         if st.button("💖 Donate to Us 💖"):
             st.markdown(
                 "Thank you for considering a donation! Please visit [WEBSITE] to support our work.")
@@ -202,8 +206,20 @@ def run():
             return df_copy
 
         if upload_type == "Excel":
+
             uploaded_file = st.file_uploader(
                 "Upload an Excel or CSV file", type=["xlsx", "xls", "csv"])
+            SAMPLE_PATH = Path(__file__).parent / "Fake Transactions" / "dummy_data_pt2.xlsx"
+            with st.container():
+                st.write("Don’t have a file handy? Download a small demo file and try the workflow before using your own data.")
+                with open(SAMPLE_PATH, "rb") as f:
+                    st.download_button(
+                        label="⬇️ Download sample transactions (.xlsx)",
+                        data=f,
+                        file_name="sample_transactions.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
 
             if uploaded_file:
                 # Initialize or update session state dataframe on new upload
