@@ -48,7 +48,8 @@ def extract_categories_from_uploaded_chart(uploaded_file):
 
 def run():
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Main", "Reconcile", "Help", "About", "Analytics"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["Main", "Reconcile", "Help", "About", "Analytics"])
     st.markdown(
         """
     <style>
@@ -116,46 +117,9 @@ def run():
         # --- Upload Type Selection ---
         upload_type = st.radio("Choose file type to upload:", ("Excel", "QBO"))
         st.markdown("---")
-        st.subheader("🔍 Reconciliation Check")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            starting_balance = st.number_input(
-                "🏁 Starting Balance 🏁", value=0.0)
-
-        with col2:
-            ending_balance = st.number_input("🏁 Ending Balance 🏁", value=0.0)
-
-        reconciliation_result = None
-
-        if "df" in st.session_state:
-            df = st.session_state.df
-            if "Amount" in df.columns:
-                total_activity = df["Amount"].sum()
-                expected_ending = starting_balance + total_activity
-                # tolerance for rounding
-                reconciled = abs(expected_ending - ending_balance) < 0.01
-
-                st.write(
-                    f"**Total Activity (sum of Amount column):** {total_activity:,.2f}")
-                st.write(
-                    f"**Expected Ending Balance:** {expected_ending:,.2f}")
-                st.write(f"**Provided Ending Balance:** {ending_balance:,.2f}")
-
-                if reconciled:
-                    st.success(
-                        "✅ Reconciled! Ending balance matches the expected total.")
-                else:
-                    st.error(
-                        "❌ Not Reconciled. Please check your entries or data.")
-            else:
-                st.warning(
-                    "⚠️ Column 'Amount' not found in uploaded data. Cannot perform reconciliation.")
-        else:
-            pass
 
         # Shared preprocessing function
+
         @st.cache_data
         def preprocess_and_categorize(df_input):
             df_copy = df_input.copy()
@@ -326,16 +290,59 @@ def run():
             st.info("The file type you have uploaded is not supported")
 
     if "original_amounts" not in st.session_state and "df" in st.session_state:
-        st.session_state.original_amounts = st.session_state.df["Amount"].copy()
+        st.session_state.original_amounts = st.session_state.df["Amount"].copy(
+        )
     with tab2:
         df = st.session_state.get("df")
+        # ----
+        st.subheader("🔍 Reconciliation Check")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            starting_balance = st.number_input(
+                "🏁 Starting Balance 🏁", value=0.0)
+
+        with col2:
+            ending_balance = st.number_input("🏁 Ending Balance 🏁", value=0.0)
+
+        reconciliation_result = None
+
+        if "df" in st.session_state:
+            df = st.session_state.df
+            if "Amount" in df.columns:
+                total_activity = df["Amount"].sum()
+                expected_ending = starting_balance + total_activity
+                # tolerance for rounding
+                reconciled = abs(expected_ending - ending_balance) < 0.01
+
+                st.write(
+                    f"**Total Activity (sum of Amount column):** {total_activity:,.2f}")
+                st.write(
+                    f"**Expected Ending Balance:** {expected_ending:,.2f}")
+                st.write(f"**Provided Ending Balance:** {ending_balance:,.2f}")
+
+                if reconciled:
+                    st.success(
+                        "✅ Reconciled! Ending balance matches the expected total.")
+                else:
+                    st.error(
+                        "❌ Not Reconciled. Please check your entries or data.")
+            else:
+                st.warning(
+                    "⚠️ Column 'Amount' not found in uploaded data. Cannot perform reconciliation.")
+        else:
+            pass
+        # ---
 
         if isinstance(df, pd.DataFrame) and not df.empty:
             col1, col2 = st.columns(2)
             with col1:
-                beginning_balance = st.number_input("Beginning Balance", value=0.00, format="%.2f")
+                beginning_balance = st.number_input(
+                    "Beginning Balance", value=0.00, format="%.2f")
             with col2:
-                ending_balance = st.number_input("Ending Balance", value=0.00, format="%.2f")
+                ending_balance = st.number_input(
+                    "Ending Balance", value=0.00, format="%.2f")
             switch_sign = st.toggle("🔁 Switch Debits and Credits", value=False)
 
             # 🔄 Apply sign change if toggled
@@ -343,8 +350,6 @@ def run():
                 df["Amount"] = st.session_state.original_amounts * -1
             else:
                 df["Amount"] = st.session_state.original_amounts.copy()
-
-            
 
             # Add a checkbox column to the dataframe
             if "Selected" not in df.columns:
@@ -369,7 +374,8 @@ def run():
             )
 
             # Filter selected transactions
-            selected = edited_df[edited_df["Selected"] == True]["Amount"].tolist()
+            selected = edited_df[edited_df["Selected"]
+                                 == True]["Amount"].tolist()
 
             cleared_total = sum(selected)
             expected_cleared = ending_balance - beginning_balance
@@ -387,10 +393,8 @@ def run():
             else:
                 st.warning("❌ Not Reconciled")
         else:
-            st.info("No data available for reconciliation. Please upload and process a file first.")
-
-
-
+            st.info(
+                "No data available for reconciliation. Please upload and process a file first.")
 
     with tab3:
         st.subheader(" How to Use RoboLedger ")
@@ -433,7 +437,8 @@ def run():
         # Make sure it's not empty
         if isinstance(df, pd.DataFrame) and not df.empty:
             # Sum of Amounts per Predicted Account
-            account_summary = df.groupby("Predicted Account")["Amount"].sum().reset_index()
+            account_summary = df.groupby("Predicted Account")[
+                "Amount"].sum().reset_index()
             account_summary.columns = ["Predicted Account", "Total Amount"]
 
             # Histogram of Amounts
@@ -451,16 +456,17 @@ def run():
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            account_summary_abs = df.groupby("Predicted Account")["Amount"].apply(lambda x: x.abs().sum()).reset_index()
+            account_summary_abs = df.groupby("Predicted Account")["Amount"].apply(
+                lambda x: x.abs().sum()).reset_index()
             account_summary_abs.columns = ["Predicted Account", "Total Amount"]
 
             fig = px.pie(
-            account_summary_abs,
-            names="Predicted Account",
-            values="Total Amount",
-            title="Total Amount per Predicted Account (Absolute Values)",
-            hole=0.4
-                )
+                account_summary_abs,
+                names="Predicted Account",
+                values="Total Amount",
+                title="Total Amount per Predicted Account (Absolute Values)",
+                hole=0.4
+            )
             st.plotly_chart(fig, use_container_width=True)
 
             # Bar chart (sums instead of counts)
@@ -485,19 +491,20 @@ def run():
             daily_expenses = df.groupby('Date')['Amount'].sum().reset_index()
 
             fig = px.line(
-                    daily_expenses,
-                    x='Date',
-                    y='Amount',
-                    title='Expenses Over Time',
-                    markers=True
-                )
+                daily_expenses,
+                x='Date',
+                y='Amount',
+                title='Expenses Over Time',
+                markers=True
+            )
             fig.update_layout(
-                    xaxis_title='Date',
-                    yaxis_title='Total Daily Expenses',
-                )
+                xaxis_title='Date',
+                yaxis_title='Total Daily Expenses',
+            )
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No data available for analytics. Please upload and process a file first.")
+            st.info(
+                "No data available for analytics. Please upload and process a file first.")
 
 
 run()
