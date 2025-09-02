@@ -10,6 +10,7 @@ from streamlit_option_menu import option_menu
 import plotly.express as px
 import seaborn as sns
 from pathlib import Path
+from datetime import date
 
 
 def extract_categories_from_uploaded_chart(uploaded_file):
@@ -69,6 +70,12 @@ def run():
         unsafe_allow_html=True
     )
 
+    FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeCHmPbM_RR1_rgu13Zuobka3GmImsfXLceqX7F--QaVc89gg/viewform"
+    DONATION_URL = "https://roboledgerofficial.streamlit.app/"
+    st.divider()
+    st.caption(
+        f"© {date.today().year} RoboLedger • 📝 [Leave feedback]({FEEDBACK_URL}) • 💖[Donate to Us]({DONATION_URL})")
+
     with st.sidebar:
         selected = option_menu("Chart of Accounts", ["Default", "Upload Custom"],
                                icons=['pip-fill', 'bi bi-upload'], menu_icon="Journal bookmark", default_index=1)
@@ -102,32 +109,8 @@ def run():
                 "Amortization", "Ask My Accountant"
             ]
 
-        st.markdown("---")
-        st.markdown("### 👨‍💻 How RoboLedger Works For YOU! 👨‍💻")
-        st.markdown(
-            "RoboLedger is your AI-powered bookkeeping assistant, designed to simplify your financial management. Here's how it works:")
-        st.markdown(
-            "We have two AI models working together to categorize your transactions accurately.")
-        st.markdown(
-            "One baseline model which is able to categorize everything regardless of prior information.")
-        st.markdown(
-            "One custom model which learns from your specific business data to provide tailored categorizations.")
-        st.markdown("When you upload your transaction data, RoboLedger first uses the custom model to categorize your transactions based on patterns it has learned from your previous data.")
-        st.markdown("If the custom model is unsure about a transaction or if it hasn't seen similar data before, it falls back to the baseline model to ensure every transaction is categorized.")
-        st.markdown("This dual-model approach ensures that you get the most accurate and relevant categorizations possible, helping you maintain clear and organized financial records.")
-        st.markdown(
-            "Our mission: make bookkeeping something that should take a couple of clicks, not hours.")
-        st.markdown("---")
-
-        FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeCHmPbM_RR1_rgu13Zuobka3GmImsfXLceqX7F--QaVc89gg/viewform"
-        st.link_button("📝 Leave feedback", FEEDBACK_URL,
-                       use_container_width=False)
-        if st.button("💖 Donate to Us 💖"):
-            st.markdown(
-                "Thank you for considering a donation! Please visit [WEBSITE] to support our work.")
-
     def main_run():
-        st.subheader("📚 Your AI-powered financial assistant 📚")
+        st.subheader("Roboledger 🤖")
         # st.subheader("Choose a file and view the contents below")
 
         # --- Upload Type Selection ---
@@ -209,9 +192,11 @@ def run():
 
             uploaded_file = st.file_uploader(
                 "Upload an Excel or CSV file", type=["xlsx", "xls", "csv"])
-            SAMPLE_PATH = Path(__file__).parent / "Fake Transactions" / "dummy_data_pt2.xlsx"
+            SAMPLE_PATH = Path(__file__).parent / \
+                "Fake Transactions" / "dummy_data_pt2.xlsx"
             with st.container():
-                st.write("Don’t have a file handy? Download a small demo file and try the workflow before using your own data.")
+                st.write(
+                    "Don’t have a file handy? Download a small demo file and try the workflow before using your own data.")
                 with open(SAMPLE_PATH, "rb") as f:
                     st.download_button(
                         label="⬇️ Download sample transactions (.xlsx)",
@@ -361,6 +346,23 @@ def run():
         st.write("RoboLedger not only categorizes transactions but also provides reconciliation checks. The team of developers are currently working on invoice and receipt processing, expense tracking, and financial reporting features. This will allow you to manage your finances comprehensively, all in one platform.")
         st.write("**How can I contribute to RoboLedger?**")
         st.write("We welcome contributions to RoboLedger! You can help by providing feedback, suggesting features, or even contributing code. If you're interested in collaborating, please reach out to us through our GitHub repository or contact us directly. Your input is invaluable in making RoboLedger better for everyone.")
+
+        st.markdown("---")
+        st.markdown("### 👨‍💻 How RoboLedger Works For YOU! 👨‍💻")
+        st.markdown(
+            "RoboLedger is your AI-powered bookkeeping assistant, designed to simplify your financial management. Here's how it works:")
+        st.markdown(
+            "We have two AI models working together to categorize your transactions accurately.")
+        st.markdown(
+            "One baseline model which is able to categorize everything regardless of prior information.")
+        st.markdown(
+            "One custom model which learns from your specific business data to provide tailored categorizations.")
+        st.markdown("When you upload your transaction data, RoboLedger first uses the custom model to categorize your transactions based on patterns it has learned from your previous data.")
+        st.markdown("If the custom model is unsure about a transaction or if it hasn't seen similar data before, it falls back to the baseline model to ensure every transaction is categorized.")
+        st.markdown("This dual-model approach ensures that you get the most accurate and relevant categorizations possible, helping you maintain clear and organized financial records.")
+        st.markdown(
+            "Our mission: make bookkeeping something that should take a couple of clicks, not hours.")
+        st.markdown("---")
     with tab4:
         if "df" in st.session_state:
             df = st.session_state.df
