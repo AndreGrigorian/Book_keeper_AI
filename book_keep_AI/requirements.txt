@@ -1,11 +1,25 @@
-streamlit
-pandas
-plotly
-seaborn
-streamlit-option-menu
-streamlit-authenticator
-PyYAML
-openai
-python-dotenv
-scikit-learn
-joblib
+# Core
+streamlit==1.37.0
+pandas==2.2.2
+plotly==5.23.0
+
+# UI extras
+streamlit-option-menu==0.3.6
+streamlit-authenticator==0.3.2
+PyYAML==6.0.2
+seaborn==0.13.2   # optional; remove if unused
+
+# AI + env
+openai==1.50.2
+python-dotenv==1.0.1
+
+# ML utilities (if your bookkeeper_brain uses sklearn)
+scikit-learn==1.4.2
+joblib==1.4.2
+
+# Excel I/O (needed by your app)
+openpyxl==3.1.5     # .xlsx reader
+xlrd==2.0.1         # .xls reader
+xlsxwriter==3.2.0   # writer used by report_generator
+
+httpx==0.27.2
