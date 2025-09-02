@@ -48,7 +48,7 @@ def extract_categories_from_uploaded_chart(uploaded_file):
 
 def run():
 
-    tab1, tab2, tab3, tab4 = st.tabs(["Main", "Help", "About", "Analytics"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Main", "Reconcile", "Help", "About", "Analytics"])
     st.markdown(
         """
     <style>
@@ -71,7 +71,7 @@ def run():
     )
 
     FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeCHmPbM_RR1_rgu13Zuobka3GmImsfXLceqX7F--QaVc89gg/viewform"
-    DONATION_URL = "https://roboledgerofficial.streamlit.app/"
+    DONATION_URL = "https://buymeacoffee.com/roboledger"
     st.divider()
     st.caption(
         f"© {date.today().year} RoboLedger • 📝 [Leave feedback]({FEEDBACK_URL}) • 💖[Donate to Us]({DONATION_URL})")
@@ -109,7 +109,7 @@ def run():
                 "Amortization", "Ask My Accountant"
             ]
 
-    def main_run():
+    with tab1:
         st.subheader("Roboledger 🤖")
         # st.subheader("Choose a file and view the contents below")
 
@@ -325,20 +325,84 @@ def run():
         else:
             st.info("The file type you have uploaded is not supported")
 
-    with tab1:
-        main_run()
-
+    if "original_amounts" not in st.session_state and "df" in st.session_state:
+        st.session_state.original_amounts = st.session_state.df["Amount"].copy()
     with tab2:
+        df = st.session_state.get("df")
+
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            col1, col2 = st.columns(2)
+            with col1:
+                beginning_balance = st.number_input("Beginning Balance", value=0.00, format="%.2f")
+            with col2:
+                ending_balance = st.number_input("Ending Balance", value=0.00, format="%.2f")
+            switch_sign = st.toggle("🔁 Switch Debits and Credits", value=False)
+
+            # 🔄 Apply sign change if toggled
+            if switch_sign:
+                df["Amount"] = st.session_state.original_amounts * -1
+            else:
+                df["Amount"] = st.session_state.original_amounts.copy()
+
+            
+
+            # Add a checkbox column to the dataframe
+            if "Selected" not in df.columns:
+                df["Selected"] = False
+            if "all_selected" not in st.session_state:
+                st.session_state.all_selected = False
+
+            # Button to toggle select all/deselect all
+            if st.button("Select All" if not st.session_state.all_selected else "Deselect All"):
+                st.session_state.all_selected = not st.session_state.all_selected
+                df["Selected"] = st.session_state.all_selected
+
+            st.subheader("Transactions")
+            edited_df = st.data_editor(
+                df,
+                column_config={
+                    "Selected": st.column_config.CheckboxColumn("✓"),
+                    "Amount": st.column_config.NumberColumn("Amount", format="$%.2f"),
+                },
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # Filter selected transactions
+            selected = edited_df[edited_df["Selected"] == True]["Amount"].tolist()
+
+            cleared_total = sum(selected)
+            expected_cleared = ending_balance - beginning_balance
+            difference = round(cleared_total - expected_cleared, 2)
+            is_reconciled = difference == 0.00
+
+            st.markdown("---")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("✅ Cleared Total", f"${cleared_total:.2f}")
+            col2.metric("📘 Expected Total", f"${expected_cleared:.2f}")
+            col3.metric("🔁 Difference", f"${difference:.2f}")
+
+            if is_reconciled:
+                st.success("🎉 Reconciled!")
+            else:
+                st.warning("❌ Not Reconciled")
+        else:
+            st.info("No data available for reconciliation. Please upload and process a file first.")
+
+
+
+
+    with tab3:
         st.subheader(" How to Use RoboLedger ")
         st.write("1. **Upload Chart of Accounts**: Start by uploading your custom Chart of Accounts in the sidebar. Ensure the file has a single column named 'Category'. If you don't upload one, the default categories will be used.")
-        st.write("2. **Upload Transaction File**: Choose the file type (Excel or QBO) and upload your transaction data. The file should contain at least 'Date', 'Memo', and 'Amount' columns.")
+        st.write("2. **Upload Transaction File**: Choose the file type (Excel or QBO) and upload your transaction data. The file should contain at least ```Date```, ```Memo```, and ```Amount``` columns.")
         st.write("3. **Reconciliation Check**: Input your starting and ending balances to verify that your transactions reconcile correctly.")
         st.write("4. **Review and Edit Transactions**: After uploading, review the categorized transactions. You can edit any row directly within the app to correct misclassifications.")
         st.write("5. **Save to Training Data**: Once you're satisfied with the categorizations, save the processed data to the training set. This will help fine-tune the AI model for your specific business needs.")
         st.write(
             "6. **Download Reports**: Finally, download the generated Profit & Loss Excel template for your records.")
 
-    with tab3:
+    with tab4:
         st.write("RoboLedger is the synthesis between AI and bookkeeping, designed to streamline your financial management. It automates data entry, categorizes transactions, and provides insights into your business finances. With RoboLedger, you can focus on growing your business while we handle the numbers.")
         st.write("**My Business is very specific, how can I use this?**")
         st.write("RoboLedger is designed to adapt to your unique business needs. By uploading your transaction data, the AI learns your specific categorization patterns, ensuring that it aligns with your financial practices. This means you can trust RoboLedger to handle your bookkeeping accurately and efficiently, tailored to your business model.")
@@ -363,65 +427,77 @@ def run():
         st.markdown(
             "Our mission: make bookkeeping something that should take a couple of clicks, not hours.")
         st.markdown("---")
-    with tab4:
-        if "df" in st.session_state:
+    with tab5:
+        df = st.session_state.get("df")
+
+        # Make sure it's not empty
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            # Sum of Amounts per Predicted Account
+            account_summary = df.groupby("Predicted Account")["Amount"].sum().reset_index()
+            account_summary.columns = ["Predicted Account", "Total Amount"]
+
+            # Histogram of Amounts
+            fig = px.histogram(
+                df,
+                x="Amount",
+                nbins=30,
+                marginal="box",
+                title="Transaction Amount Distribution",
+            )
+            fig.update_layout(
+                xaxis_title="Amount",
+                yaxis_title="Frequency",
+                bargap=0.1,
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            account_summary_abs = df.groupby("Predicted Account")["Amount"].apply(lambda x: x.abs().sum()).reset_index()
+            account_summary_abs.columns = ["Predicted Account", "Total Amount"]
+
+            fig = px.pie(
+            account_summary_abs,
+            names="Predicted Account",
+            values="Total Amount",
+            title="Total Amount per Predicted Account (Absolute Values)",
+            hole=0.4
+                )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Bar chart (sums instead of counts)
+            fig = px.bar(
+                account_summary,
+                x="Predicted Account",
+                y="Total Amount",
+                title="Total Amount by Predicted Account",
+                text="Total Amount",
+                color="Predicted Account"
+            )
+            fig.update_layout(
+                xaxis_title="Predicted Account",
+                yaxis_title="Total Amount",
+                showlegend=False
+            )
             df = st.session_state.df
-            account_summary = df["Predicted Account"].value_counts(
-            ).reset_index()
-            account_summary.columns = ["Predicted Account", "Count"]
-            account_counts = df["Predicted Account"].value_counts(
-            ).reset_index()
-            account_counts.columns = ["Predicted Account", "Count"]
-            if not df.empty:
-                try:
-                    fig = px.histogram(
-                        df,
-                        x="Amount",
-                        nbins=30,
-                        marginal="box",
-                        title="Transaction Amount Distribution",
-                    )
-                    fig.update_layout(
-                        xaxis_title="Amount",
-                        yaxis_title="Frequency",
-                        bargap=0.1,
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
+            df['Date'] = pd.to_datetime(df['Date'])
 
-                    fig = px.pie(
-                        account_summary,
-                        names="Predicted Account",
-                        values="Count",
-                        title="Transaction Count per Account",
-                        hole=0.4  # Optional: makes it a donut chart
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+            # Sum amount per day
+            daily_expenses = df.groupby('Date')['Amount'].sum().reset_index()
 
-                    fig = px.bar(
-                        account_counts,
-                        x="Predicted Account",
-                        y="Count",
-                        title="Frequency of Predicted Accounts",
-                        text="Count",
-                        color="Predicted Account"  # Optional: adds color by category
-                    )
-
-                    fig.update_layout(
-                        xaxis_title="Predicted Account",
-                        yaxis_title="Frequency",
-                        showlegend=False
-                    )
-
-                    st.plotly_chart(fig, use_container_width=True)
-
-                except Exception as e:
-                    st.error(f"Error generating plot: {e}")
-            else:
-                st.info(
-                    "No data available for analytics. Please upload and process a file first.")
+            fig = px.line(
+                    daily_expenses,
+                    x='Date',
+                    y='Amount',
+                    title='Expenses Over Time',
+                    markers=True
+                )
+            fig.update_layout(
+                    xaxis_title='Date',
+                    yaxis_title='Total Daily Expenses',
+                )
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info(
-                "No data available for analytics. Please upload and process a file first.")
+            st.info("No data available for analytics. Please upload and process a file first.")
 
 
 run()
