@@ -13,6 +13,8 @@ from pathlib import Path
 from datetime import date
 
 
+
+
 def extract_categories_from_uploaded_chart(uploaded_file):
     try:
         # ✅ FIX: Check if it's a list and grab the first file
@@ -46,8 +48,51 @@ def extract_categories_from_uploaded_chart(uploaded_file):
         return None
 
 
-def run():
+def greedy_subset_sum(transactions, target, tolerance=0.01):
+    """
+    Greedy algorithm to find a subset of transaction amounts that sum to the target.
+    Returns indices of matching transactions.
+    """
+    sorted_indices = sorted(range(len(transactions)), key=lambda i: abs(transactions[i]), reverse=True)
+    current_sum = 0.0
+    selected_indices = []
 
+    for i in sorted_indices:
+        amt = transactions[i]
+        if abs(current_sum + amt - target) <= tolerance:
+            selected_indices.append(i)
+            current_sum += amt
+            break  # close enough
+        elif abs(current_sum + amt) < abs(target) + tolerance:
+            selected_indices.append(i)
+            current_sum += amt
+
+    if abs(current_sum - target) <= tolerance:
+        return selected_indices
+    return None
+
+def find_subset_sum(transactions, target, tolerance=0.01):
+    """
+    Backtracking subset sum solver with pruning.
+    Returns indices of transactions that sum to the target within tolerance.
+    """
+
+    def backtrack(start, current_sum, path):
+        if abs(current_sum - target) <= tolerance:
+            return path
+        if current_sum > target + tolerance:
+            return None
+        for i in range(start, len(transactions)):
+            result = backtrack(i + 1, current_sum + transactions[i], path + [i])
+            if result is not None:
+                return result
+        return None
+
+    return backtrack(0, 0.0, [])
+
+
+def run():
+    matched_indices = None
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
         ["Main", "Reconcile", "Help", "About", "Analytics"])
     st.markdown(
@@ -305,6 +350,28 @@ def run():
             with col2:
                 ending_balance = st.number_input(
                     "Ending Balance", value=0.00, format="%.2f")
+            
+            
+            
+            if st.button("👽 AutoReconcile 👽"):
+                target = ending_balance - beginning_balance
+                matched_indices = find_subset_sum(df["Amount"].tolist(), target)
+
+                if matched_indices is not None:
+                    df["Selected"] = False  # Reset
+                    for i in matched_indices:
+                        df.at[i, "Selected"] = True
+                    st.success("✅ Match found and selected.")
+                else:
+                    st.warning("⚠️ No matching combination found.")
+                # Add a checkbox column to the dataframe
+                if "Selected" not in df.columns:
+                    df["Selected"] = False
+                if "all_selected" not in st.session_state:
+                    st.session_state.all_selected = False
+
+
+
             switch_sign = st.toggle("🔁 Switch Debits and Credits", value=False)
 
             # 🔄 Apply sign change if toggled
@@ -312,13 +379,6 @@ def run():
                 df["Amount"] = st.session_state.original_amounts * -1
             else:
                 df["Amount"] = st.session_state.original_amounts.copy()
-
-            # Add a checkbox column to the dataframe
-            if "Selected" not in df.columns:
-                df["Selected"] = False
-            if "all_selected" not in st.session_state:
-                st.session_state.all_selected = False
-
             # Button to toggle select all/deselect all
             if st.button("Select All" if not st.session_state.all_selected else "Deselect All"):
                 st.session_state.all_selected = not st.session_state.all_selected
@@ -365,8 +425,7 @@ def run():
         st.write("3. **Reconciliation Check**: Input your starting and ending balances to verify that your transactions reconcile correctly.")
         st.write("4. **Review and Edit Transactions**: After uploading, review the categorized transactions. You can edit any row directly within the app to correct misclassifications.")
         st.write("5. **Save to Training Data**: Once you're satisfied with the categorizations, save the processed data to the training set. This will help fine-tune the AI model for your specific business needs.")
-        st.write(
-            "6. **Download Reports**: Finally, download the generated Profit & Loss Excel template for your records.")
+        st.write("6. **Download Reports**: Finally, download the generated Profit & Loss Excel template for your records.")
 
     with tab4:
         st.write("RoboLedger is the synthesis between AI and bookkeeping, designed to streamline your financial management. It automates data entry, categorizes transactions, and provides insights into your business finances. With RoboLedger, you can focus on growing your business while we handle the numbers.")
