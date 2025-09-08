@@ -11,7 +11,8 @@ import plotly.express as px
 import seaborn as sns
 from pathlib import Path
 from datetime import date
-
+import zipfile
+import qbo_parser
 
 
 
@@ -92,6 +93,7 @@ def find_subset_sum(transactions, target, tolerance=0.01):
 
 
 def run():
+    st.title("🤖 RoboLedger - AI Bookkeeping Assistant 🤖")
     matched_indices = None
     tab1, tab2, tab3, tab4, tab5 = st.tabs(
         ["Main", "Reconcile", "Help", "About", "Analytics"])
@@ -154,9 +156,9 @@ def run():
                 "Estimated Tax Payments", "Income Tax Expense", "Payroll Taxes", "Business Loan Interest",
                 "Amortization", "Ask My Accountant"
             ]
-
+    
     with tab1:
-        st.subheader("Roboledger 🤖")
+        
         # st.subheader("Choose a file and view the contents below")
 
         # --- Upload Type Selection ---
@@ -222,7 +224,7 @@ def run():
                         if uploaded_file.name.endswith((".xlsx", ".xls")):
                             df_raw = pd.read_excel(uploaded_file)
                         elif uploaded_file.name.endswith(".csv"):
-                            df_raw = pd.read_csv(uploaded_file)
+                            df_raw = pd.read_csv(uploaded_file)                
                         else:
                             st.error("Unsupported file type.")
                             st.stop()
@@ -331,8 +333,32 @@ def run():
                         st.error(f"Error: {e}")
             else:
                 st.info("Please upload a file.")
+        elif upload_type == "QBO":
+                uploaded_file = st.file_uploader("Upload a .zip file containing your QBO file", type=["zip"])
+                if uploaded_file is not None:
+                    try:
+                        # ✅ Ensure the uploaded file is passed as a binary buffer
+                        with zipfile.ZipFile(uploaded_file) as z:
+                            qbo_files = [f for f in z.namelist() if f.endswith(".qbo")]
+
+                            if not qbo_files:
+                                st.warning("⚠️ No .qbo files found inside the ZIP archive.")
+                            else:
+                                qbo_filename = qbo_files[0]
+                                with z.open(qbo_filename) as qbo_file:
+                                    df = qbo_parser.parse_qbo_file(qbo_file)
+
+                                    if not df.empty:
+                                        st.success("✅ Parsed QBO file successfully!")
+                                        st.dataframe(df)
+                                    else:
+                                        st.warning("⚠️ No transactions found in QBO file.")
+                    except zipfile.BadZipFile:
+                        st.error("❌ Uploaded file is not a valid ZIP archive.")
+                    except Exception as e:
+                        st.error(f"❌ Unexpected error: {e}")
         else:
-            st.info("The file type you have uploaded is not supported")
+            st.info("The file type you have uploaded is not supported at the moment. Please use the Excel upload option instead.")
 
     if "original_amounts" not in st.session_state and "df" in st.session_state:
         st.session_state.original_amounts = st.session_state.df["Amount"].copy(

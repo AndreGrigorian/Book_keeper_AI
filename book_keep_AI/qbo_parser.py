@@ -1,20 +1,9 @@
 import pandas as pd
 from ofxparse import OfxParser
 
-def parse_qbo_to_df(qbo_file_path: str) -> pd.DataFrame:
-    """
-    Parses a QBO (QuickBooks) file and returns a DataFrame of transactions.
-
-    Parameters:
-        qbo_file_path (str): Path to the .qbo file.
-
-    Returns:
-        pd.DataFrame: DataFrame with columns [date, amount, type, payee, memo, id]
-    """
+def parse_qbo_file(file_obj) -> pd.DataFrame:
     try:
-        with open(qbo_file_path, 'r') as f:
-            ofx = OfxParser.parse(f)
-
+        ofx = OfxParser.parse(file_obj)
         transactions = ofx.account.statement.transactions
 
         data = [{
@@ -26,9 +15,8 @@ def parse_qbo_to_df(qbo_file_path: str) -> pd.DataFrame:
             "id": txn.id
         } for txn in transactions]
 
-        df = pd.DataFrame(data)
+        return pd.DataFrame(data)
 
-        return df
-    
     except Exception as e:
-        print(f"❌ Failed to parse QBO file: {e}")
+        st.error(f"❌ Failed to parse QBO file: {e}")
+        return pd.DataFrame()  # ✅ Always return a DataFrame
