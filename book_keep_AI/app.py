@@ -202,7 +202,7 @@ def run():
         if upload_type == "Excel":
 
             uploaded_file = st.file_uploader(
-                "Upload an Excel or CSV file", type=["xlsx", "xls", "csv"])
+                "Upload an Excel or CSV file", type=["xlsx", "xls", "csv", "zip"])
             SAMPLE_PATH = Path(__file__).parent / \
                 "Fake Transactions" / "dummy_data_pt2.xlsx"
             with st.container():
@@ -224,7 +224,29 @@ def run():
                         if uploaded_file.name.endswith((".xlsx", ".xls")):
                             df_raw = pd.read_excel(uploaded_file)
                         elif uploaded_file.name.endswith(".csv"):
-                            df_raw = pd.read_csv(uploaded_file)                
+                            df_raw = pd.read_csv(uploaded_file)
+                        elif uploaded_file.name.endswith(".zip"):
+                            try:
+                                # ✅ Ensure the uploaded file is passed as a binary buffer
+                                with zipfile.ZipFile(uploaded_file) as z:
+                                    qbo_files = [f for f in z.namelist() if f.endswith(".qbo")]
+
+                                    if not qbo_files:
+                                        st.warning("⚠️ No .qbo files found inside the ZIP archive.")
+                                    else:
+                                        qbo_filename = qbo_files[0]
+                                        with z.open(qbo_filename) as qbo_file:
+                                            df_raw = qbo_parser.parse_qbo_file(qbo_file)
+
+                                            if not df_raw.empty:
+                                                st.success("✅ Parsed QBO file successfully!")
+                                                st.dataframe(df_raw)
+                                            else:
+                                                st.warning("⚠️ No transactions found in QBO file.")
+                            except zipfile.BadZipFile:
+                                st.error("❌ Uploaded file is not a valid ZIP archive.")
+                            except Exception as e:
+                                st.error(f"❌ Unexpected error: {e}")                
                         else:
                             st.error("Unsupported file type.")
                             st.stop()
@@ -391,10 +413,10 @@ def run():
                 else:
                     st.warning("⚠️ No matching combination found.")
                 # Add a checkbox column to the dataframe
-                if "Selected" not in df.columns:
-                    df["Selected"] = False
-                if "all_selected" not in st.session_state:
-                    st.session_state.all_selected = False
+            if "Selected" not in df.columns:
+                df["Selected"] = False
+            if "all_selected" not in st.session_state:
+                st.session_state.all_selected = False
 
 
 
@@ -427,7 +449,8 @@ def run():
 
             cleared_total = sum(selected)
             expected_cleared = ending_balance - beginning_balance
-            difference = round(cleared_total - expected_cleared, 2)
+            difference = round(float(cleared_total) - float(expected_cleared), 2)
+
             is_reconciled = difference == 0.00
 
             st.markdown("---")

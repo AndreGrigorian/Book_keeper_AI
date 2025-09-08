@@ -1,5 +1,6 @@
 import pandas as pd
 from ofxparse import OfxParser
+import streamlit as st
 
 def parse_qbo_file(file_obj) -> pd.DataFrame:
     try:
@@ -7,12 +8,10 @@ def parse_qbo_file(file_obj) -> pd.DataFrame:
         transactions = ofx.account.statement.transactions
 
         data = [{
-            "date": txn.date,
-            "amount": txn.amount,
-            "type": txn.type,
-            "payee": txn.payee,
-            "memo": txn.memo,
-            "id": txn.id
+            "Date": txn.date,
+            "Amount": txn.amount,
+            "Type": txn.type,
+            "Memo": txn.payee
         } for txn in transactions]
 
         return pd.DataFrame(data)
