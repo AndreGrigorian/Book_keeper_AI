@@ -5,6 +5,11 @@ import data_cleaner  # your custom module
 import classify_transactions  # your categorizer module
 import bookkeeper_brain  # your model training module
 import os
+from dotenv import load_dotenv
+from openai import OpenAI
+import openai
+from pandasai import SmartDataframe
+from pandasai.llm.openai import OpenAI
 import report_generator  # your report generation module
 from streamlit_option_menu import option_menu
 import plotly.express as px
@@ -13,8 +18,9 @@ from pathlib import Path
 from datetime import date
 import zipfile
 import qbo_parser
-
-
+import time
+import itertools
+from streamlit_chat import message
 
 def extract_categories_from_uploaded_chart(uploaded_file):
     try:
@@ -49,36 +55,14 @@ def extract_categories_from_uploaded_chart(uploaded_file):
         return None
 
 
-def greedy_subset_sum(transactions, target, tolerance=0.01):
-    """
-    Greedy algorithm to find a subset of transaction amounts that sum to the target.
-    Returns indices of matching transactions.
-    """
-    sorted_indices = sorted(range(len(transactions)), key=lambda i: abs(transactions[i]), reverse=True)
-    current_sum = 0.0
-    selected_indices = []
 
-    for i in sorted_indices:
-        amt = transactions[i]
-        if abs(current_sum + amt - target) <= tolerance:
-            selected_indices.append(i)
-            current_sum += amt
-            break  # close enough
-        elif abs(current_sum + amt) < abs(target) + tolerance:
-            selected_indices.append(i)
-            current_sum += amt
-
-    if abs(current_sum - target) <= tolerance:
-        return selected_indices
-    return None
-
-def find_subset_sum(transactions, target, tolerance=0.01):
-    """
-    Backtracking subset sum solver with pruning.
-    Returns indices of transactions that sum to the target within tolerance.
-    """
+def find_subset_sum(transactions, target, tolerance=0.00, max_time=10.0):
+    start_time = time.time()
 
     def backtrack(start, current_sum, path):
+        # Stop if time exceeded
+        if time.time() - start_time > max_time:
+            return None
         if abs(current_sum - target) <= tolerance:
             return path
         if current_sum > target + tolerance:
@@ -92,11 +76,31 @@ def find_subset_sum(transactions, target, tolerance=0.01):
     return backtrack(0, 0.0, [])
 
 
+def find_subset_sum_ordered(transactions, target, tolerance=0.00, max_time=10.0):
+    start_time = time.time()
+    n = len(transactions)
+
+    # Try subsets starting from largest size to smallest
+    for r in range(n, 0, -1):
+        if time.time() - start_time > max_time:
+            return None
+
+        for indices in itertools.combinations(range(n), r):
+            subset_sum = sum(transactions[i] for i in indices)
+
+            if abs(subset_sum - target) <= tolerance:
+                return list(indices)
+
+    return None
+
+
+
+
 def run():
-    st.title("🤖 RoboLedger - AI Bookkeeping Assistant 🤖")
+    st.title("👽 RoboLedger 👽")
     matched_indices = None
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["Main", "Reconcile", "Help", "About", "Analytics"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["Main", "Reconcile", "Analytics", "Help", "About", "Meet RoboLedger" ])
     st.markdown(
         """
     <style>
@@ -122,11 +126,11 @@ def run():
     DONATION_URL = "https://buymeacoffee.com/roboledger"
     st.divider()
     st.caption(
-        f"© {date.today().year} RoboLedger • 📝 [Leave feedback]({FEEDBACK_URL}) • 💖[Donate to Us]({DONATION_URL})")
+        f"© {date.today().year} RoboLedger • 📝 [Leave feedback]({FEEDBACK_URL}) • 💖[Donate to Us]({DONATION_URL}) •")
 
     with st.sidebar:
         selected = option_menu("Chart of Accounts", ["Default", "Upload Custom"],
-                               icons=['pip-fill', 'bi bi-upload'], menu_icon="Journal bookmark", default_index=1)
+                               icons=['pip-fill', 'bi bi-upload'], menu_icon="Journal bookmark", default_index=0)
 
         categories = []
 
@@ -199,8 +203,9 @@ def run():
 
             return df_copy
 
-        if upload_type == "Excel":
-
+        if upload_type == "Excel" or upload_type == "QBO":
+            if upload_type == "QBO":
+                st.info("ℹ️ QBO upload selected. Please upload a ZIP file containing your QBO files.")
             uploaded_file = st.file_uploader(
                 "Upload an Excel or CSV file", type=["xlsx", "xls", "csv", "zip"])
             SAMPLE_PATH = Path(__file__).parent / \
@@ -223,8 +228,10 @@ def run():
                     try:
                         if uploaded_file.name.endswith((".xlsx", ".xls")):
                             df_raw = pd.read_excel(uploaded_file)
+                            df_raw['Amount'] = df_raw['Amount'].astype(float)
                         elif uploaded_file.name.endswith(".csv"):
                             df_raw = pd.read_csv(uploaded_file)
+                            df_raw['Amount'] = df_raw['Amount'].astype(float)
                         elif uploaded_file.name.endswith(".zip"):
                             try:
                                 # ✅ Ensure the uploaded file is passed as a binary buffer
@@ -237,7 +244,7 @@ def run():
                                         qbo_filename = qbo_files[0]
                                         with z.open(qbo_filename) as qbo_file:
                                             df_raw = qbo_parser.parse_qbo_file(qbo_file)
-
+                                            df_raw['Amount'] = df_raw['Amount'].astype(float)
                                             if not df_raw.empty:
                                                 st.success("✅ Parsed QBO file successfully!")
                                                 st.dataframe(df_raw)
@@ -354,31 +361,7 @@ def run():
                     except ValueError as e:
                         st.error(f"Error: {e}")
             else:
-                st.info("Please upload a file.")
-        elif upload_type == "QBO":
-                uploaded_file = st.file_uploader("Upload a .zip file containing your QBO file", type=["zip"])
-                if uploaded_file is not None:
-                    try:
-                        # ✅ Ensure the uploaded file is passed as a binary buffer
-                        with zipfile.ZipFile(uploaded_file) as z:
-                            qbo_files = [f for f in z.namelist() if f.endswith(".qbo")]
-
-                            if not qbo_files:
-                                st.warning("⚠️ No .qbo files found inside the ZIP archive.")
-                            else:
-                                qbo_filename = qbo_files[0]
-                                with z.open(qbo_filename) as qbo_file:
-                                    df = qbo_parser.parse_qbo_file(qbo_file)
-
-                                    if not df.empty:
-                                        st.success("✅ Parsed QBO file successfully!")
-                                        st.dataframe(df)
-                                    else:
-                                        st.warning("⚠️ No transactions found in QBO file.")
-                    except zipfile.BadZipFile:
-                        st.error("❌ Uploaded file is not a valid ZIP archive.")
-                    except Exception as e:
-                        st.error(f"❌ Unexpected error: {e}")
+                st.info("Please upload a file to get started.")
         else:
             st.info("The file type you have uploaded is not supported at the moment. Please use the Excel upload option instead.")
 
@@ -403,7 +386,7 @@ def run():
             
             if st.button("👽 AutoReconcile 👽"):
                 target = ending_balance - beginning_balance
-                matched_indices = find_subset_sum(df["Amount"].tolist(), target)
+                matched_indices = find_subset_sum_ordered(df["Amount"].tolist(), target)
 
                 if matched_indices is not None:
                     df["Selected"] = False  # Reset
@@ -446,10 +429,10 @@ def run():
             # Filter selected transactions
             selected = edited_df[edited_df["Selected"]
                                  == True]["Amount"].tolist()
-
+            
             cleared_total = sum(selected)
             expected_cleared = ending_balance - beginning_balance
-            difference = round(float(cleared_total) - float(expected_cleared), 2)
+            difference = round(cleared_total - expected_cleared, 2)
 
             is_reconciled = difference == 0.00
 
@@ -467,7 +450,7 @@ def run():
             st.info(
                 "No data available for reconciliation. Please upload and process a file first.")
 
-    with tab3:
+    with tab4:
         st.subheader(" How to Use RoboLedger ")
         st.write("1. **Upload Chart of Accounts**: Start by uploading your custom Chart of Accounts in the sidebar. Ensure the file has a single column named 'Category'. If you don't upload one, the default categories will be used.")
         st.write("2. **Upload Transaction File**: Choose the file type (Excel or QBO) and upload your transaction data. The file should contain at least ```Date```, ```Memo```, and ```Amount``` columns.")
@@ -476,7 +459,7 @@ def run():
         st.write("5. **Save to Training Data**: Once you're satisfied with the categorizations, save the processed data to the training set. This will help fine-tune the AI model for your specific business needs.")
         st.write("6. **Download Reports**: Finally, download the generated Profit & Loss Excel template for your records.")
 
-    with tab4:
+    with tab5:
         st.write("RoboLedger is the synthesis between AI and bookkeeping, designed to streamline your financial management. It automates data entry, categorizes transactions, and provides insights into your business finances. With RoboLedger, you can focus on growing your business while we handle the numbers.")
         st.write("**My Business is very specific, how can I use this?**")
         st.write("RoboLedger is designed to adapt to your unique business needs. By uploading your transaction data, the AI learns your specific categorization patterns, ensuring that it aligns with your financial practices. This means you can trust RoboLedger to handle your bookkeeping accurately and efficiently, tailored to your business model.")
@@ -501,7 +484,7 @@ def run():
         st.markdown(
             "Our mission: make bookkeeping something that should take a couple of clicks, not hours.")
         st.markdown("---")
-    with tab5:
+    with tab3:
         df = st.session_state.get("df")
 
         # Make sure it's not empty
@@ -576,5 +559,89 @@ def run():
             st.info(
                 "No data available for analytics. Please upload and process a file first.")
 
+    with tab6:
+        load_dotenv()  # loads OPENAI_API_KEY from .env
+
+
+        def get_secret(name: str, default=None):
+            # 1) env var wins (works everywhere, including Docker/Render/etc.)
+            v = os.getenv(name)
+            if v:
+                return v
+            # 2) only try Streamlit secrets if file exists
+            try:
+                return st.secrets.get(name, default)
+            except FileNotFoundError:
+                return default
+
+
+        OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
+
+
+        if not OPENAI_API_KEY:
+            st.error("Missing OPENAI_API_KEY. Add it in your host's Secrets/Env panel.")
+            st.stop()
+
+        llm = OpenAI(api_token=st.secrets["OPENAI_API_KEY"])
+
+        if "df" not in st.session_state:
+            st.session_state.df = pd.DataFrame({
+                "Name": ["Alice", "Bob", "Charlie", "Diana"],
+                "Age": [25, 32, 29, 40],
+                "City": ["NY", "Paris", "London", "Berlin"]
+            })
+
+        if "smart_df" not in st.session_state:
+            st.session_state.smart_df = SmartDataframe(st.session_state.df, config={"llm": llm})
+
+        st.session_state.setdefault('past', [])
+        st.session_state.setdefault('generated', [])
+
+        # -------------------------------
+        # 2. Chat handler using PandasAI
+        # -------------------------------
+        def on_input_change():
+            user_input = st.session_state.user_input
+            st.session_state.past.append(user_input)
+
+            try:
+                result = st.session_state.smart_df.chat(user_input)
+                st.session_state.generated.append({
+                    'type': 'normal',
+                    'data': str(result)
+                })
+            except Exception as e:
+                st.session_state.generated.append({
+                    'type': 'normal',
+                    'data': f"❌ Error: {e}"
+                })
+
+        # -------------------------------
+        # 3. Clear button
+        # -------------------------------
+        def on_btn_click():
+            st.session_state.past.clear()
+            st.session_state.generated.clear()
+
+        # -------------------------------
+        # 4. UI
+        # -------------------------------
+        st.title("🧠 PandasAI Chatbot")
+
+        with st.empty().container():
+            for i in range(len(st.session_state.generated)):
+                message(st.session_state.past[i], is_user=True, key=f"{i}_user")
+                message(
+                    st.session_state.generated[i]['data'],
+                    key=f"{i}",
+                    allow_html=True,
+                    is_table=(st.session_state.generated[i]['type'] == 'table')
+                )
+            st.button("Clear", on_click=on_btn_click)
+
+        st.text_input("Ask about your DataFrame...", on_change=on_input_change, key="user_input")
+
+
+        
 
 run()
