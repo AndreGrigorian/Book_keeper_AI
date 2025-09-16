@@ -1,21 +1,24 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+import matplotlib.pyplot as plt
 import data_cleaner  # your custom module
 import classify_transactions  # your categorizer module
 import bookkeeper_brain  # your model training module
 import os
+import re
+import ast
 from dotenv import load_dotenv
 from openai import OpenAI
 import openai
-from pandasai import SmartDataframe
-from pandasai.llm.openai import OpenAI
+import io
 import report_generator  # your report generation module
 from streamlit_option_menu import option_menu
 import plotly.express as px
 import seaborn as sns
 from pathlib import Path
 from datetime import date
+import contextlib
 import zipfile
 import qbo_parser
 import time
@@ -578,69 +581,139 @@ def run():
         OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
 
 
-        if not OPENAI_API_KEY:
-            st.error("Missing OPENAI_API_KEY. Add it in your host's Secrets/Env panel.")
-            st.stop()
+        client = OpenAI(api_key=OPENAI_API_KEY)
 
-        llm = OpenAI(api_token=st.secrets["OPENAI_API_KEY"])
+        st.session_state.setdefault("past", [])
+        st.session_state.setdefault("generated", [])
 
-        if "df" not in st.session_state:
-            st.session_state.df = pd.DataFrame({
-                "Name": ["Alice", "Bob", "Charlie", "Diana"],
-                "Age": [25, 32, 29, 40],
-                "City": ["NY", "Paris", "London", "Berlin"]
-            })
+        def ask_gpt_for_code(user_input, df_preview):
+            system_prompt = f"""
+        You are a Python data analyst. The user provides a pandas DataFrame called `df`.
+        They ask a question about the data.
+        Your job is to generate only Python code that uses `df` to answer the question.
+        Requirements:
+        - Do not include markdown or explanations.
+        - Assign the final output to a variable named `result`.
+        - Do not use print().
+        DataFrame preview:
+        {df_preview}
+        """
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_input}
+            ]
 
-        if "smart_df" not in st.session_state:
-            st.session_state.smart_df = SmartDataframe(st.session_state.df, config={"llm": llm})
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=messages,
+                temperature=0,
+            )
 
-        st.session_state.setdefault('past', [])
-        st.session_state.setdefault('generated', [])
+            return response.choices[0].message.content.strip()
 
-        # -------------------------------
-        # 2. Chat handler using PandasAI
-        # -------------------------------
+
+        def clean_code(code: str) -> str:
+            """
+            Extract and clean Python code from GPT response.
+            Removes markdown fences and trims output text.
+            """
+            code = re.sub(r"^```(?:python)?\s*", "", code, flags=re.MULTILINE)
+            code = code.replace("```", "")
+            code = code.strip()
+
+            split_keywords = ["Output:", "Result:", "Explanation:", "Answer:"]
+            for kw in split_keywords:
+                if kw in code:
+                    code = code.split(kw)[0].strip()
+
+            return code
+
+
+        def is_expression(code: str) -> bool:
+            try:
+                parsed = ast.parse(code)
+                return len(parsed.body) == 1 and isinstance(parsed.body[0], ast.Expr)
+            except Exception:
+                return False
+
+
+        def run_code_on_df(code, df):
+            import matplotlib.pyplot as plt
+
+            local_vars = {"df": df.copy()}
+            f = io.StringIO()
+            fig = None
+
+            if is_expression(code):
+                code = f"result = {code}"
+
+            try:
+                with contextlib.redirect_stdout(f):
+                    exec(code, {}, local_vars)
+
+                output = f.getvalue().strip()
+
+                # Detect if a matplotlib plot was created
+                if "plt" in code or "plot" in code or isinstance(local_vars.get("result"), plt.Axes):
+                    fig = plt.gcf()
+                    plt.clf()
+                    output = output or "📊 Plot generated."
+
+                elif "result" in local_vars:
+                    output = output or str(local_vars["result"])
+
+                else:
+                    output = output or "✅ Code executed but no result was assigned to `result`."
+
+                return output, fig
+
+            except Exception as e:
+                return f"❌ Error running code: {e}\n\nCode:\n{code}", None
+
+
+
+        # Load df from session state
+        df = st.session_state.get("df")
+
+
         def on_input_change():
             user_input = st.session_state.user_input
             st.session_state.past.append(user_input)
 
-            try:
-                result = st.session_state.smart_df.chat(user_input)
-                st.session_state.generated.append({
-                    'type': 'normal',
-                    'data': str(result)
-                })
-            except Exception as e:
-                st.session_state.generated.append({
-                    'type': 'normal',
-                    'data': f"❌ Error: {e}"
-                })
+            df = st.session_state.df
+            df_preview = df.head().to_string()
 
-        # -------------------------------
-        # 3. Clear button
-        # -------------------------------
+            code = ask_gpt_for_code(user_input, df_preview)
+            cleaned_code = clean_code(code)
+            result = run_code_on_df(cleaned_code, df)
+
+            st.session_state.generated.append({
+                "type": "normal",
+                "data": f"```python\n{cleaned_code}\n```\n\n**Output:**\n{result}"
+            })
+
+
         def on_btn_click():
             st.session_state.past.clear()
             st.session_state.generated.clear()
 
-        # -------------------------------
-        # 4. UI
-        # -------------------------------
-        st.title("🧠 PandasAI Chatbot")
 
-        with st.empty().container():
-            for i in range(len(st.session_state.generated)):
-                message(st.session_state.past[i], is_user=True, key=f"{i}_user")
-                message(
-                    st.session_state.generated[i]['data'],
-                    key=f"{i}",
-                    allow_html=True,
-                    is_table=(st.session_state.generated[i]['type'] == 'table')
-                )
-            st.button("Clear", on_click=on_btn_click)
+        # === Streamlit App UI ===
 
-        st.text_input("Ask about your DataFrame...", on_change=on_input_change, key="user_input")
+        st.subheader("🧠 RoboLedger 🧠")
 
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            chat_placeholder = st.empty()
+
+            with chat_placeholder.container():
+                for i in range(len(st.session_state.generated)):
+                    message(st.session_state.past[i], is_user=True, key=f"{i}_user")
+                    message(st.session_state.generated[i]["data"], key=f"{i}", allow_html=True)
+
+            st.text_input("Ask me about the DataFrame...", on_change=on_input_change, key="user_input")
+            st.button("Clear Chat", on_click=on_btn_click)
+        else:
+            st.info("No data available. Please upload and process a file first.")
 
         
 
