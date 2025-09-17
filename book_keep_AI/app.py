@@ -8,6 +8,7 @@ import bookkeeper_brain  # your model training module
 import os
 import re
 import ast
+from streamlit_avatar import avatar
 from dotenv import load_dotenv
 from openai import OpenAI
 import openai
@@ -100,10 +101,11 @@ def find_subset_sum_ordered(transactions, target, tolerance=0.00, max_time=10.0)
 
 
 def run():
-    st.title("👽 RoboLedger 👽")
+    st.title("```🤖 RoboLedger 🤖```")
+    st.markdown("```AI-Powered Bookkeeping and Reconciliation```")
     matched_indices = None
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["Main", "Reconcile", "Analytics", "Help", "About", "Meet RoboLedger" ])
+        ["Main", "Reconcile", "Analytics", "Meet RoboLedger", "Help", "About"])
     st.markdown(
         """
     <style>
@@ -387,7 +389,7 @@ def run():
             
             
             
-            if st.button("👽 AutoReconcile 👽"):
+            if st.button("📚 AutoReconcile 📚"):
                 target = ending_balance - beginning_balance
                 matched_indices = find_subset_sum_ordered(df["Amount"].tolist(), target)
 
@@ -453,7 +455,7 @@ def run():
             st.info(
                 "No data available for reconciliation. Please upload and process a file first.")
 
-    with tab4:
+    with tab5:
         st.subheader(" How to Use RoboLedger ")
         st.write("1. **Upload Chart of Accounts**: Start by uploading your custom Chart of Accounts in the sidebar. Ensure the file has a single column named 'Category'. If you don't upload one, the default categories will be used.")
         st.write("2. **Upload Transaction File**: Choose the file type (Excel or QBO) and upload your transaction data. The file should contain at least ```Date```, ```Memo```, and ```Amount``` columns.")
@@ -462,7 +464,7 @@ def run():
         st.write("5. **Save to Training Data**: Once you're satisfied with the categorizations, save the processed data to the training set. This will help fine-tune the AI model for your specific business needs.")
         st.write("6. **Download Reports**: Finally, download the generated Profit & Loss Excel template for your records.")
 
-    with tab5:
+    with tab6:
         st.write("RoboLedger is the synthesis between AI and bookkeeping, designed to streamline your financial management. It automates data entry, categorizes transactions, and provides insights into your business finances. With RoboLedger, you can focus on growing your business while we handle the numbers.")
         st.write("**My Business is very specific, how can I use this?**")
         st.write("RoboLedger is designed to adapt to your unique business needs. By uploading your transaction data, the AI learns your specific categorization patterns, ensuring that it aligns with your financial practices. This means you can trust RoboLedger to handle your bookkeeping accurately and efficiently, tailored to your business model.")
@@ -562,7 +564,7 @@ def run():
             st.info(
                 "No data available for analytics. Please upload and process a file first.")
 
-    with tab6:
+    with tab4:
         load_dotenv()  # loads OPENAI_API_KEY from .env
 
 
@@ -639,7 +641,8 @@ def run():
 
         def run_code_on_df(code, df):
             import matplotlib.pyplot as plt
-
+            import pandas as pd
+            import numpy as np
             local_vars = {"df": df.copy()}
             f = io.StringIO()
             fig = None
@@ -656,7 +659,7 @@ def run():
                 # Detect if a matplotlib plot was created
                 if "plt" in code or "plot" in code or isinstance(local_vars.get("result"), plt.Axes):
                     fig = plt.gcf()
-                    plt.clf()
+                    ## plt.clf()
                     output = output or "📊 Plot generated."
 
                 elif "result" in local_vars:
@@ -685,12 +688,15 @@ def run():
 
             code = ask_gpt_for_code(user_input, df_preview)
             cleaned_code = clean_code(code)
-            result = run_code_on_df(cleaned_code, df)
+            output, fig = run_code_on_df(cleaned_code, df)
 
+            # Append result text
+            message_data = f"```python\n{cleaned_code}\n```\n\n**Output:**\n{output}"
             st.session_state.generated.append({
                 "type": "normal",
-                "data": f"```python\n{cleaned_code}\n```\n\n**Output:**\n{result}"
-            })
+                "data": message_data,
+                "fig": fig  # store figure if available
+    })
 
 
         def on_btn_click():
@@ -699,21 +705,48 @@ def run():
 
 
         # === Streamlit App UI ===
+        # Page setup and styles
+        st.set_page_config(page_title="RoboLedger", layout="centered")
 
-        st.subheader("🧠 RoboLedger 🧠")
+        # Init session state
+        if "past" not in st.session_state:
+            st.session_state.past = []
+        if "generated" not in st.session_state:
+            st.session_state.generated = []
 
+        st.title("👾 RoboLedger ChatBot 👾")
+        st.markdown("Ask questions about your transaction data. The AI will generate insights, plots, and summaries.")
+        st.caption("Note: Responses are generated by an AI model and may not always be accurate. Please verify critical information independently.")
+        st.markdown("---")
+
+        # Only show chat if df exists
         if isinstance(df, pd.DataFrame) and not df.empty:
-            chat_placeholder = st.empty()
+            # Full-page chat layout
+            for i in range(len(st.session_state.generated)):
+                with st.chat_message("user", avatar="🤓"):
+                    st.markdown(st.session_state.past[i])
 
-            with chat_placeholder.container():
-                for i in range(len(st.session_state.generated)):
-                    message(st.session_state.past[i], is_user=True, key=f"{i}_user")
-                    message(st.session_state.generated[i]["data"], key=f"{i}", allow_html=True)
+                with st.chat_message("assistant", avatar="👾"):
+                    st.markdown("**Generated Code:**")
+                    st.code(clean_code(st.session_state.generated[i]["data"]), language="python")
 
-            st.text_input("Ask me about the DataFrame...", on_change=on_input_change, key="user_input")
-            st.button("Clear Chat", on_click=on_btn_click)
+                    st.markdown("**Output:**")
+                    st.markdown(st.session_state.generated[i]["data"].split("**Output:**")[-1])
+
+                    if st.session_state.generated[i].get("fig"):
+                        st.pyplot(st.session_state.generated[i]["fig"])
+
+            # Input at the bottom
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                st.text_input("Ask about your data...", key="user_input", on_change=on_input_change, label_visibility="collapsed")
+            with col2:
+                st.button("🧹", on_click=on_btn_click, help="Clear chat")
+
         else:
             st.info("No data available. Please upload and process a file first.")
+
+
 
         
 
