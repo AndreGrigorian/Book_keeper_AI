@@ -14,4 +14,3 @@ streamlit_chat==0.1.1
 streamlit_option_menu==0.4.0
 transformers==4.55.2
 xlsxwriter==3.2.5
-~treamlit==1.48.1
