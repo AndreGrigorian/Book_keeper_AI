@@ -8,7 +8,6 @@ import bookkeeper_brain  # your model training module
 import os
 import re
 import ast
-from streamlit_avatar import avatar
 from dotenv import load_dotenv
 from openai import OpenAI
 import openai
