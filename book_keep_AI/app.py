@@ -170,7 +170,7 @@ def run():
     with tab0:
         st.markdown("## ```Getting Started with RoboLedger```")
         st.markdown("---")
-        st.video("https://www.youtube.com/watch?v=lnhUs7_bT5s")
+        st.video("https://www.youtube.com/watch?v=wbiv50uKQns")
     with tab1:
         
         # st.subheader("Choose a file and view the contents below")
